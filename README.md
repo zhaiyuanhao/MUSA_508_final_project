@@ -29,6 +29,8 @@ Coffee shop numbers,
 Number of restaurants, grocery stores, parks nearby,
 education facilities numbers nearby,
 
+*Data Source*: Census tract boundaries change over time. If you want to use census tracts, consider the NHGIS (For which there is an R package) or the Longitudinal Tract Database (you can download longitudinal decennial census data freely from their website).
+
 # Model Selecting
 Maybe Logistic Regression? The predicted result will be 0 or 1.
 
