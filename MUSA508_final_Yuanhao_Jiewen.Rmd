@@ -467,19 +467,55 @@ head(chicago_data)
 
 ```
 
+
 ```{r chicago gentrification index map}
-chicago_data <- chicago_data %>%
-  
+chicago_map <- chicagoTracts %>% 
+  left_join(chicago_data, by = "TRTID10")%>%
+  st_as_sf()
+```
+
+
+```{r chicago gentrification index map}
+
+library(scales)
+
+ggplot(chicago_map) +
+  geom_sf(aes(fill = index), colour = "white", size = 0.1) + 
+  facet_wrap(~ Year) +  
+  scale_fill_gradient(name = "Gentrification Index", low = "red", high = "blue", 
+                      breaks = pretty_breaks(n = 5)) +  
+  labs(title = "Gentrification Index Map in Chicago (1980-2010)",
+       caption = "Data source:  1980, 1990, 2000 and 2010 Decennial Census (LTDB); 2008-2012 Five-Year American Community Survey ") +  
+  theme_void() +  
+  theme(legend.position = "bottom",  
+        legend.title.align = 0.5,  
+        plot.title = element_text(size = 14), 
+        plot.caption = element_text(size = 8),  
+        legend.text = element_text(size = 10)) 
+
+```
+
+```{r chicago gentrification binary dataset}
+# filter the crime data under 3 years
+
+chicago_map <- chicago_map %>%
+  mutate(gentrification = ifelse(index >= 4, 1, 0))
+glimpse(chicago_map)
 ```
 
 ```{r chicago gentrification binary map}
-# filter the crime data under 3 years
 
-chicago_data <- chicago_data %>%
-  mutate(Recidivism_numeric = ifelse(recidivism_within_3years == "true", 1, 0))
-glimpse(Recidivism)
+ggplot(chicago_map) +
+  geom_sf(aes(fill = as.factor(gentrification)), colour = NA) +  
+  facet_wrap(~ Year) +  # 按年份分组显示
+  scale_fill_manual(values = c("0" = "red", "1" = "blue"), 
+                    labels = c("0" = "Non-Gentrified", "1" = "Gentrified"), 
+                    name = "Gentrification Status") +  
+  labs(title = "Gentrification Index Map in Chicago (1980-2010)") +  
+  theme_void()  
+
+
 ```
-
 
 
 
