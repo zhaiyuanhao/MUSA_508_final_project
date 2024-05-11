@@ -67,9 +67,11 @@ mapTheme <- theme(plot.title =element_text(size=12),
                   plot.margin = margin(1, 1, 1, 1, 'cm'),
                   legend.key.height = unit(1, "cm"), legend.key.width = unit(0.2, "cm"))
 
-palette5 <- c("#eff3ff","#bdd7e7","#6baed6","#3182bd","#08519c")
-palette4 <- c("#D2FBD4","#92BCAB","#527D82","#123F5A")
-palette2 <- c("#6baed6","#08519c")
+
+palette5 <- c("#981FAC","#CB0F8B","#FF006A","#FE4C35","#FE9900")
+palette4 <- c("#981FAC","#FF006A","#FE4C35","#FE9900")
+palette2 <- c("#981FAC","#FF006A")
+
 ```
 
 ```{r install_census_API_key, warning = FALSE, include=FALSE, eval = TRUE}
@@ -80,6 +82,15 @@ tidycensus::census_api_key("e79f3706b6d61249968c6ce88794f6f556e5bf3d", overwrite
 ## 2.2. Import Census Info
 
 ```{r get_census, message=FALSE, warning=FALSE, cache=TRUE, results = 'hide'}
+fullcount80 <- read.csv("D:/Upenn/006/CPLN5920/final/ltdb_std_all_fullcount/LTDB_Std_1980_fullcount.csv")
+
+sample80 <- read.csv("D:/Upenn/006/CPLN5920/final/LTDB_Std_All_Sample/ltdb_std_all_sample/ltdb_std_1980_sample.csv")
+
+sample80 <- rename(sample80, TRTID10 = trtid10)
+
+data80 <- merge(fullcount80, sample80, by = "TRTID10")
+
+
 fullcount90 <- read.csv("D:/Upenn/006/CPLN5920/final/ltdb_std_all_fullcount/LTDB_Std_1990_fullcount.csv")
 sample90 <- read.csv("D:/Upenn/006/CPLN5920/final/LTDB_Std_All_Sample/ltdb_std_all_sample/ltdb_std_1990_sample.csv")
 data90 <- merge(fullcount90, sample90, by = "TRTID10")
@@ -87,11 +98,60 @@ data90 <- merge(fullcount90, sample90, by = "TRTID10")
 fullcount00 <- read.csv("D:/Upenn/006/CPLN5920/final/ltdb_std_all_fullcount/LTDB_Std_2000_fullcount.csv")
 sample00 <- read.csv("D:/Upenn/006/CPLN5920/final/LTDB_Std_All_Sample/ltdb_std_all_sample/ltdb_std_2000_sample.csv")
 data00 <- merge(fullcount00, sample00, by = "TRTID10")
+
+data10 <- read.csv("D:/Upenn/006/CPLN5920/final/ltdb_std_all_fullcount/LTDB_Std_2010_fullcount.csv")
 ```
 
 ```{r}
-glimpse(data00)
+glimpse(data10)
 ```
+
+
+
+```{r ChicagoCensus80}
+chicagoCensus80 <- data80 %>%
+  filter(county.x == "Cook County" & state.x == "IL")%>%
+
+  rename(Total_Pop = POP80,
+         White_Pop = NHWHT80,
+         Black_Pop = NHBLK80,
+         Latino_Pop = HISP80,
+         Elder_Pop = A60UP80,
+         Children_Pop = A18UND80,
+         College_Pop = col80, #  College Education
+         Owner_Occupied = OWN80, #  Owner Occupied
+         Total_housing_units = HU80,
+         Vacant_housing_units = VAC80,
+         Median_House_Value = MHMVAL80,
+         Median_Rent = MRENT80,
+         Below_Poverty_Pop = npov80,
+         Female_Households = fhh80,
+         Total_Households = family80)%>%
+  
+  select(TRTID10, Total_Pop, White_Pop, Black_Pop, Latino_Pop, Elder_Pop, Children_Pop, College_Pop, Owner_Occupied, Median_House_Value, Median_Rent, Below_Poverty_Pop, Female_Households, Total_Households, Total_housing_units, Vacant_housing_units)%>%  
+  
+  mutate(
+    Pt_White = White_Pop / Total_Pop * 100, 
+    Pt_Black = Black_Pop / Total_Pop * 100, 
+    Pt_Latino = Latino_Pop / Total_Pop * 100,  
+    Pt_Elderly = Elder_Pop / Total_Pop * 100,  # % Elderly (Age 75+)
+    Pt_Children = (Children_Pop / Total_Pop) * 100,  # % Children (Age <18)
+    Pt_College = College_Pop / Total_Pop * 100,
+    Pt_Owner_Occupied = Owner_Occupied / Total_housing_units * 100,  
+    Median_House_Value_Adjusted = Median_House_Value * 2.72,  # Median House Value, adjust for inflation
+    Median_Rent_Adjusted = Median_Rent * 2.727, # Median Rent Value, adjust for inflation
+    Pt_Below_Poverty = Below_Poverty_Pop / Total_Pop * 100,
+    Pt_Female_Households = Female_Households / Total_Households * 100,
+    Pt_Vacant = Vacant_housing_units / Total_housing_units * 100
+    )
+```
+
+
+  
+```{r}
+glimpse(chicagoCensus80)
+```
+
 
 ```{r ChicagoCensus90}
 chicagoCensus90 <- data90 %>%
@@ -101,7 +161,7 @@ chicagoCensus90 <- data90 %>%
          White_Pop = NHWHT90,
          Black_Pop = NHBLK90,
          Latino_Pop = HISP90,
-         Elder_Pop = A75UP90,
+         Elder_Pop = A60UP90,
          Children_Pop = A18UND90,
          College_Pop = COL90, #  College Education
          Owner_Occupied = OWN90, #  Owner Occupied
@@ -109,7 +169,7 @@ chicagoCensus90 <- data90 %>%
          Vacant_housing_units = VAC90,
          Median_House_Value = MHMVAL90,
          Median_Rent = MRENT90,
-         Below_Poverty_Pop = DPOV90,
+         Below_Poverty_Pop = NPOV90,
          Professional_Employeed = PROF90,
          Total_Employeed = EMPCLF90,
          Female_Households = FHH90,
@@ -121,19 +181,17 @@ chicagoCensus90 <- data90 %>%
     Pt_White = White_Pop / Total_Pop * 100, 
     Pt_Black = Black_Pop / Total_Pop * 100, 
     Pt_Latino = Latino_Pop / Total_Pop * 100,  
-    Pt_Elderly = Elder_Pop / Total_Pop * 100,  # % Elderly (Age 75+)
+    Pt_Elderly = Elder_Pop / Total_Pop * 100,  # % Elderly (Age 60+)
     Pt_Children = (Children_Pop / Total_Pop) * 100,  # % Children (Age <18)
     Pt_College = College_Pop / Total_Pop * 100,
     Pt_Owner_Occupied = Owner_Occupied / Total_housing_units * 100,  
-    Median_House_Value_Adjusted = Median_House_Value,  # Median House Value, adjust for inflation
-    Median_Rent_Adjusted = Median_Rent, # Median Rent Value, adjust for inflation
+    Median_House_Value_Adjusted = Median_House_Value * 1.69,  # Median House Value, adjust for inflation
+    Median_Rent_Adjusted = Median_Rent * 1.69, # Median Rent Value, adjust for inflation
     Pt_Below_Poverty = Below_Poverty_Pop / Total_Pop * 100,
-    #Pt_Manager = Professional_Employeed / Total_Employeed * 100, #
     Pt_Female_Households = Female_Households / Total_Households * 100,
     Pt_Vacant = Vacant_housing_units / Total_housing_units * 100
-      #Percent_Private_School  
-  )%>%
-  select( -Total_Pop,-White_Pop, -Black_Pop, -Latino_Pop, -Elder_Pop, -Children_Pop, -College_Pop, -Owner_Occupied,-Below_Poverty_Pop,  -Female_Households, -Total_Households, -Total_housing_units, -Vacant_housing_units,-Median_House_Value, -Median_Rent) 
+     )
+  
 
 ```
 
@@ -149,7 +207,7 @@ chicagoCensus00 <- data00 %>%
          White_Pop = NHWHT00,
          Black_Pop = NHBLK00,
          Latino_Pop = HISP00,
-         Elder_Pop = A75UP00,
+         Elder_Pop = A60UP00,
          Children_Pop = A18UND00,
          College_Pop = COL00,
          Owner_Occupied = OWN00,
@@ -157,7 +215,7 @@ chicagoCensus00 <- data00 %>%
          Vacant_housing_units = VAC00,
          Median_House_Value = MHMVAL00,
          Median_Rent = MRENT00,
-         Below_Poverty_Pop = DPOV00,
+         Below_Poverty_Pop = NPOV00,
          Professional_Employeed = PROF00,
          Total_Employeed = EMPCLF00,
          Female_Households = FHH00,
@@ -173,21 +231,25 @@ chicagoCensus00 <- data00 %>%
     Pt_Children = (Children_Pop / Total_Pop) * 100,  # % Children (Age <18)
     Pt_College = College_Pop / Total_Pop * 100,
     Pt_Owner_Occupied = Owner_Occupied / Total_housing_units * 100,  
-    Median_House_Value_Adjusted = Median_House_Value,  # Median House Value, adjust for inflation
-    Median_Rent_Adjusted = Median_Rent, # Median Rent Value, adjust for inflation
+    Median_House_Value_Adjusted = Median_House_Value * 1.27,  # Median House Value, adjust for inflation
+    Median_Rent_Adjusted = Median_Rent * 1.27, # Median Rent Value, adjust for inflation
     Pt_Below_Poverty = Below_Poverty_Pop / Total_Pop * 100,
-    #Pt_Manager = Professional_Employeed / Total_Employeed * 100, 
     Pt_Female_Households = Female_Households / Total_Households * 100,
     Pt_Vacant = Vacant_housing_units / Total_housing_units * 100
-      #Percent_Private_School  
-  )%>%
-  select( -Total_Pop,-White_Pop, -Black_Pop, -Latino_Pop, -Elder_Pop, -Children_Pop, -College_Pop, -Owner_Occupied,-Below_Poverty_Pop,  -Female_Households, -Total_Households, -Total_housing_units, -Vacant_housing_units,-Median_House_Value, -Median_Rent) 
+       
+  )
+ 
 
 ```
 
 ```{r}
 glimpse(chicagoCensus00)
 ```
+
+
+
+
+
 
 ```{r}
 # 载入2019年ACS 5-year survey的变量
@@ -196,7 +258,7 @@ View(vars)
 ```
 
 ```{r get_census10, message=FALSE, warning=FALSE, cache=TRUE, results = 'hide'}
-chicagoCensus10 <- 
+chicagoCensus10a <- 
   get_acs(geography = "tract", 
           variables = c("B01003_001", "B02009_001", 
                         "B02001_002", "B03001_003",
@@ -212,126 +274,154 @@ chicagoCensus10 <-
           county=c("Cook"),
           output = "wide") %>%
   
-  rename(Total_Pop = B01003_001E,
-         White_Pop = B02001_002E,
-         Black_Pop = B02009_001E,
-         Latino_Pop = B03001_003E,
-         Elder_Pop = B06001_012E, #  Elderly (Age 75+)
-         Children_Pop = B09001_001E, #  Children (Age <18)
-         College_Pop = B06009_005E ,
-         Owner_Occupied = B07013_002E,
-         Total_housing_units = B25001_001E,
-         Vacant_housing_units = B25004_001E,
+  rename(College_Pop = B06009_005E,
          Median_House_Value = B25077_001E,
          Median_Rent = B25064_001E,
          Below_Poverty_Pop = B17001_002E,
-         
-         #Professional_Employeed = B24011_001E,
-         #Total_Employed_1 = B23006_027E,
-         #Total_Employed_2 = B23006_013E,
-         #Total_Employed_3 =  B23006_006E,
-         #Total_Employed_4 = B23006_020E,
-        
-         Female_Households = B11005_002E,
-         Total_Households = B11001_001E)%>%
+         )%>%
   
-  select(Total_Pop, White_Pop, Black_Pop, Latino_Pop, Elder_Pop, Children_Pop, College_Pop, Owner_Occupied, Median_House_Value, Median_Rent, Below_Poverty_Pop,   Female_Households, Total_Households, Total_housing_units, Vacant_housing_units,
-         GEOID, geometry) %>% #Professional_Employeed,Total_Employed_1, Total_Employed_2, Total_Employed_3, Total_Employed_4
+  mutate(TRTID10 = as.numeric(GEOID))
+
+```
+
+```{r ChicagoCensus10}
+chicagoCensus10b <- data10 %>%
+  filter(county == "Cook County" & state == "IL")%>%
+
+  rename(TRTID10= tractid,
+    Total_Pop = pop10,
+         White_Pop = nhwht10,
+         Black_Pop = nhblk10,
+         Latino_Pop = hisp10,
+         Elder_Pop = a60up10,
+         Children_Pop = a18und10,
+         Owner_Occupied = own10,
+         Total_housing_units = hu10,
+         Vacant_housing_units = vac10,
+         Female_Households = fhh10,
+         Total_Households = family10)
+```
+
+```{r ChicagoCensus10}
+#College_Pop = COL00,Median_House_Value = MHMVAL00,Median_Rent = MRENT00,Below_Poverty_Pop = NPOV00,
+chicagoCensus10 <- chicagoCensus10a %>%
+  inner_join(chicagoCensus10b,by ="TRTID10")%>%
+
+
+  select(TRTID10, Total_Pop, White_Pop, Black_Pop, Latino_Pop, Elder_Pop, Children_Pop, College_Pop, Owner_Occupied, Median_House_Value, Median_Rent, Below_Poverty_Pop, Female_Households, Total_Households, Total_housing_units, Vacant_housing_units)%>%
   
-  
-  
-  mutate(Pt_White = White_Pop / Total_Pop * 100, 
+  mutate(
+    Pt_White = White_Pop / Total_Pop * 100, 
     Pt_Black = Black_Pop / Total_Pop * 100, 
     Pt_Latino = Latino_Pop / Total_Pop * 100,  
-    Pt_Elderly = Elder_Pop / Total_Pop * 100,  # % Elderly (Age 75+)
+    Pt_Elderly = Elder_Pop / Total_Pop * 100,  # % Elderly (Age 60+)
     Pt_Children = (Children_Pop / Total_Pop) * 100,  # % Children (Age <18)
     Pt_College = College_Pop / Total_Pop * 100,
     Pt_Owner_Occupied = Owner_Occupied / Total_housing_units * 100,  
     Median_House_Value_Adjusted = Median_House_Value,  # Median House Value, adjust for inflation
     Median_Rent_Adjusted = Median_Rent, # Median Rent Value, adjust for inflation
     Pt_Below_Poverty = Below_Poverty_Pop / Total_Pop * 100,
-    #Pt_Manager = Professional_Employeed / (Total_Employed_1 + Total_Employed_2 + Total_Employed_3 + Total_Employed_4) * 100, #
     Pt_Female_Households = Female_Households / Total_Households * 100,
-    Pt_Vacant = Vacant_housing_units / Total_housing_units * 100)%>%
-  select( -Total_Pop,-White_Pop, -Black_Pop, -Latino_Pop, -Elder_Pop, -Children_Pop, -College_Pop, -Owner_Occupied,-Below_Poverty_Pop,  -Female_Households, -Total_Households, -Total_housing_units, -Vacant_housing_units,-Median_House_Value, -Median_Rent) #-Professional_Employeed, -Total_Employed_1, -Total_Employed_2, -Total_Employed_3, -Total_Employed_4,
+    Pt_Vacant = Vacant_housing_units / Total_housing_units * 100
+       
+  )
+ 
+
 ```
+
+
 
 ```{r}
 glimpse(chicagoCensus10)
 ```
 
-```{r get_census20, message=FALSE, warning=FALSE, cache=TRUE, results = 'hide'}
-chicagoCensus20 <- 
-  get_acs(geography = "tract", 
-          variables = c("B01003_001", "B02009_001", 
-                        "B02001_002", "B03001_003",
-                        "B06001_012", "B09001_001", 
-                        "B06009_005","B07013_002",
-                        "B25001_001", "B25004_001",
-                        "B25077_001", "B25064_001",
-                        "B17001_002", "B24011_001",
-                        	"B11005_002","B11001_001"), #"B23006_027", "B23006_013", "B23006_006", "B23006_020",
-          year = 2020, 
-          state = "IL", 
-          geometry = TRUE, 
-          county=c("Cook"),
-          output = "wide") %>%
-  
-  rename(Total_Pop = B01003_001E,
-         White_Pop = B02001_002E,
-         Black_Pop = B02009_001E,
-         Latino_Pop = B03001_003E,
-         Elder_Pop = B06001_012E, #  Elderly (Age 75+)
-         Children_Pop = B09001_001E, #  Children (Age <18)
-         College_Pop = B06009_005E ,
-         Owner_Occupied = B07013_002E,
-         Total_housing_units = B25001_001E,
-         Vacant_housing_units = B25004_001E,
-         Median_House_Value = B25077_001E,
-         Median_Rent = B25064_001E,
-         Below_Poverty_Pop = B17001_002E,
-         
-         #Professional_Employeed = B24011_001E,
-         #Total_Employed_1 = B23006_027E,
-         #Total_Employed_2 = B23006_013E,
-         #Total_Employed_3 =  B23006_006E,
-         #Total_Employed_4 = B23006_020E,
-        
-         Female_Households = B11005_002E,
-         Total_Households = B11001_001E)%>%
-  
-  select(Total_Pop, White_Pop, Black_Pop, Latino_Pop, Elder_Pop, Children_Pop, College_Pop, Owner_Occupied, Median_House_Value, Median_Rent, Below_Poverty_Pop,   Female_Households, Total_Households, Total_housing_units, Vacant_housing_units,
-         GEOID, geometry) %>% #Professional_Employeed,Total_Employed_1, Total_Employed_2, Total_Employed_3, Total_Employed_4
-  
-  
-  
-  mutate(Pt_White = White_Pop / Total_Pop * 100, 
-    Pt_Black = Black_Pop / Total_Pop * 100, 
-    Pt_Latino = Latino_Pop / Total_Pop * 100,  
-    Pt_Elderly = Elder_Pop / Total_Pop * 100,  # % Elderly (Age 75+)
-    Pt_Children = (Children_Pop / Total_Pop) * 100,  # % Children (Age <18)
-    Pt_College = College_Pop / Total_Pop * 100,
-    Pt_Owner_Occupied = Owner_Occupied / Total_housing_units * 100,  
-    Median_House_Value_Adjusted = Median_House_Value,  # Median House Value, adjust for inflation
-    Median_Rent_Adjusted = Median_Rent, # Median Rent Value, adjust for inflation
-    Pt_Below_Poverty = Below_Poverty_Pop / Total_Pop * 100,
-    #Pt_Manager = Professional_Employeed / (Total_Employed_1 + Total_Employed_2 + Total_Employed_3 + Total_Employed_4) * 100, #
-    Pt_Female_Households = Female_Households / Total_Households * 100,
-    Pt_Vacant = Vacant_housing_units / Total_housing_units * 100)%>%
-  select( -Total_Pop,-White_Pop, -Black_Pop, -Latino_Pop, -Elder_Pop, -Children_Pop, -College_Pop, -Owner_Occupied,-Below_Poverty_Pop,  -Female_Households, -Total_Households, -Total_housing_units, -Vacant_housing_units,-Median_House_Value, -Median_Rent) #-Professional_Employeed, -Total_Employed_1, -Total_Employed_2, -Total_Employed_3, -Total_Employed_4,
-```
 
-```{r}
-glimpse(chicagoCensus20)
-```
 ```{r extract_geometries }
 chicagoTracts <- 
   chicagoCensus10 %>%
   as.data.frame() %>%
-  distinct(GEOID, .keep_all = TRUE) %>%
-  select(GEOID, geometry) %>% 
+  distinct(TRTID10, .keep_all = TRUE) %>%
+  select(TRTID10, geometry) %>% 
   st_sf
 ```
+
+
+```{r combine data}
+chicagoCensus80 <- chicagoCensus80 %>% mutate(Year = 1980)
+chicagoCensus90 <- chicagoCensus90 %>% mutate(Year = 1990)
+chicagoCensus00 <- chicagoCensus00 %>% mutate(Year = 2000)
+chicagoCensus10 <- chicagoCensus10 %>% mutate(Year = 2010)
+
+chicago_data <- bind_rows(chicagoCensus80, chicagoCensus90, chicagoCensus00, chicagoCensus10)
+```
+
+
+## 2.3. Calculate City Averages in Chicago
+
+```{r chicago_average}
+chicago_averages <- chicago_data %>%
+  group_by(Year) %>%
+  summarise(
+    Total_Pop = sum(Total_Pop, na.rm = TRUE),
+    White_Pop = sum(White_Pop, na.rm = TRUE),
+    Black_Pop = sum(Black_Pop, na.rm = TRUE),
+    Latino_Pop = sum(Latino_Pop, na.rm = TRUE),
+    Elder_Pop = sum(Elder_Pop, na.rm = TRUE),
+    Children_Pop = sum(Children_Pop, na.rm = TRUE),
+    College_Pop = sum(College_Pop, na.rm = TRUE),
+    Owner_Occupied = sum(Owner_Occupied, na.rm = TRUE),
+    Below_Poverty_Pop = sum(Below_Poverty_Pop, na.rm = TRUE),
+    Female_Households = sum(Female_Households, na.rm = TRUE),
+    Total_Households = sum(Total_Households, na.rm = TRUE),
+    Vacant_housing_units = sum(Vacant_housing_units, na.rm = TRUE),
+    Total_housing_units = sum(Total_housing_units, na.rm = TRUE),
+    Median_House_Value_Adjusted = median(Median_House_Value_Adjusted, na.rm = TRUE),
+    Median_Rent_Adjusted = median(Median_Rent_Adjusted, na.rm = TRUE)
+  )%>%
+  
+  mutate(Pt_White = (White_Pop / Total_Pop) * 100,
+         Pt_Black = Black_Pop / Total_Pop * 100, 
+    Pt_Latino = Latino_Pop / Total_Pop * 100,  
+    Pt_Elderly = Elder_Pop / Total_Pop * 100,  # % Elderly (Age 60+)
+    Pt_Children = (Children_Pop / Total_Pop) * 100,  # % Children (Age <18)
+    Pt_College = College_Pop / Total_Pop * 100,
+    Pt_Owner_Occupied = Owner_Occupied / Total_housing_units * 100,  
+    Pt_Below_Poverty = Below_Poverty_Pop / Total_Pop * 100,
+    Pt_Female_Households = Female_Households / Total_Households * 100,
+    Pt_Vacant = Vacant_housing_units / Total_housing_units * 100
+         )%>%
+select(Year, Pt_White,Pt_Black,Pt_Latino,Pt_Elderly,Pt_Children,Pt_College,Pt_Owner_Occupied,Pt_Below_Poverty,Pt_Female_Households,Pt_Vacant,Median_House_Value_Adjusted,Median_Rent_Adjusted)
+```
+
+```{r}
+styled_table <- kable(chicago_averages, format = "html", digits = 2, 
+                      caption = "Summary Statistics by Year", booktabs = TRUE) %>%
+  kable_styling(full_width = FALSE) %>%
+  add_header_above(c(" " = 1, "Summary Statistics" = 11, " " = 1), font_size = 15)
+
+styled_table
+```
+
+
+
+```{r exploratory_continuous_density, fig.width=10, message=FALSE, warning=FALSE}
+chicago_averages %>%
+  tidyr::pivot_longer(cols = -Year, names_to = "Variable", values_to = "value") %>%
+  ggplot() + 
+  geom_bar(aes(x = Year, y = value), stat = "identity") + 
+  facet_wrap(~Variable, scales = "free", ncol = 4) +
+  scale_fill_manual(values = palette2) +
+  labs(x="Year", y="Value",
+       title = "Feature Distribution with the Likelihood of Gentrification from 1980-2010",
+       subtitle = "(City Averages in Chicago)") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+
+```
+
+
+## 2.4. Calculate Gentrification Index from 1980-2010 in Chicago
 
 
 
