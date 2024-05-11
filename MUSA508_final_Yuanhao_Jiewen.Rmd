@@ -81,6 +81,8 @@ tidycensus::census_api_key("e79f3706b6d61249968c6ce88794f6f556e5bf3d", overwrite
 
 ## 2.2. Import Census Info
 
+Longitudinal Tract Database (LTDB)
+
 ```{r get_census, message=FALSE, warning=FALSE, cache=TRUE, results = 'hide'}
 fullcount80 <- read.csv("D:/Upenn/006/CPLN5920/final/ltdb_std_all_fullcount/LTDB_Std_1980_fullcount.csv")
 
@@ -138,7 +140,7 @@ chicagoCensus80 <- data80 %>%
     Pt_Children = (Children_Pop / Total_Pop) * 100,  # % Children (Age <18)
     Pt_College = College_Pop / Total_Pop * 100,
     Pt_Owner_Occupied = Owner_Occupied / Total_housing_units * 100,  
-    Median_House_Value_Adjusted = Median_House_Value * 2.72,  # Median House Value, adjust for inflation
+    Median_House_Value_Adjusted = Median_House_Value * 2.72,  # Median House Value, adjust for inflation, https://www.bls.gov/data/inflation_calculator.htm
     Median_Rent_Adjusted = Median_Rent * 2.727, # Median Rent Value, adjust for inflation
     Pt_Below_Poverty = Below_Poverty_Pop / Total_Pop * 100,
     Pt_Female_Households = Female_Households / Total_Households * 100,
@@ -170,12 +172,11 @@ chicagoCensus90 <- data90 %>%
          Median_House_Value = MHMVAL90,
          Median_Rent = MRENT90,
          Below_Poverty_Pop = NPOV90,
-         Professional_Employeed = PROF90,
-         Total_Employeed = EMPCLF90,
+         
          Female_Households = FHH90,
          Total_Households = FAMILY90)%>%
   
-  select(TRTID10, Total_Pop, White_Pop, Black_Pop, Latino_Pop, Elder_Pop, Children_Pop, College_Pop, Owner_Occupied, Median_House_Value, Median_Rent, Below_Poverty_Pop, Professional_Employeed, Total_Employeed, Female_Households, Total_Households, Total_housing_units, Vacant_housing_units)%>%
+  select(TRTID10, Total_Pop, White_Pop, Black_Pop, Latino_Pop, Elder_Pop, Children_Pop, College_Pop, Owner_Occupied, Median_House_Value, Median_Rent, Below_Poverty_Pop,  Female_Households, Total_Households, Total_housing_units, Vacant_housing_units)%>%
   
   mutate(
     Pt_White = White_Pop / Total_Pop * 100, 
@@ -216,12 +217,12 @@ chicagoCensus00 <- data00 %>%
          Median_House_Value = MHMVAL00,
          Median_Rent = MRENT00,
          Below_Poverty_Pop = NPOV00,
-         Professional_Employeed = PROF00,
-         Total_Employeed = EMPCLF00,
+        
+       
          Female_Households = FHH00,
          Total_Households = FAMILY00)%>%
   
-  select(TRTID10, Total_Pop, White_Pop, Black_Pop, Latino_Pop, Elder_Pop, Children_Pop, College_Pop, Owner_Occupied, Median_House_Value, Median_Rent, Below_Poverty_Pop, Professional_Employeed, Total_Employeed, Female_Households, Total_Households, Total_housing_units, Vacant_housing_units)%>%
+  select(TRTID10, Total_Pop, White_Pop, Black_Pop, Latino_Pop, Elder_Pop, Children_Pop, College_Pop, Owner_Occupied, Median_House_Value, Median_Rent, Below_Poverty_Pop, Female_Households, Total_Households, Total_housing_units, Vacant_housing_units)%>%
   
   mutate(
     Pt_White = White_Pop / Total_Pop * 100, 
@@ -423,11 +424,61 @@ chicago_averages %>%
 
 ## 2.4. Calculate Gentrification Index from 1980-2010 in Chicago
 
+Variable Score Assignments:
+Variables Type of Association
+% White (Non-Hispanic) Above City Average, Positive (+1)
+% Black Above City Average, Negative (-1)
+% Latino Above City Average, Negative (-1)
+% Elderly (Age 65+) Above City Average, Negative (-1)
+% Children (Age 5-19) Above City Average, Negative (-1)
+% College Education (Bachelor’s degree or higher) Above City Average, Positive (+1)
+Median House Value (Adjusted for inflation) Above City Average, Positive (+1)
+Median Rent (Adjusted for inflation) Above City Average, Positive (+1)
+% Owner Occupied Above City Average, Positive (+1)
+% Families Below Poverty Above City Average, Negative (-1)
+% Female Households with Children Above City Average, Negative (-1)
+% Vacant Housing Units Above City Average, Negative (-1)
 
 
+```{r}
+chicago_data <- chicago_data%>%
+  select(Year,TRTID10, Pt_White,Pt_Black,Pt_Latino,Pt_Elderly,Pt_Children,Pt_College,Pt_Owner_Occupied,Pt_Below_Poverty,Pt_Female_Households,Pt_Vacant,Median_House_Value_Adjusted,Median_Rent_Adjusted)
 
+```
 
+```{r gentrification index}
+calculate_index <- function(row, averages) {
+  variables <- c("Pt_White", "Pt_Black", "Pt_Latino", "Pt_Elderly", "Pt_Children",
+                 "Pt_College", "Median_House_Value_Adjusted", "Median_Rent_Adjusted",
+                 "Pt_Owner_Occupied", "Pt_Below_Poverty", "Pt_Female_Households", "Pt_Vacant")
+  
+  scores <- c(1, -1, -1, -1, -1, 1, 1, 1, 1, -1, -1, -1)
+  
+  year_avg <- averages %>% filter(Year == row["Year"]) %>% select(variables) %>% unlist()
 
+  score <- sum((row[variables] > year_avg) * scores)
+  
+  return(score)
+}
+
+chicago_data$index <- apply(chicago_data, 1, function(row) calculate_index(row, chicago_averages))
+
+head(chicago_data)
+
+```
+
+```{r chicago gentrification index map}
+chicago_data <- chicago_data %>%
+  
+```
+
+```{r chicago gentrification binary map}
+# filter the crime data under 3 years
+
+chicago_data <- chicago_data %>%
+  mutate(Recidivism_numeric = ifelse(recidivism_within_3years == "true", 1, 0))
+glimpse(Recidivism)
+```
 
 
 
