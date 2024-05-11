@@ -496,7 +496,7 @@ ggplot(chicago_map) +
 ```
 
 ```{r chicago gentrification binary dataset}
-# filter the crime data under 3 years
+# gentrification index threshold-4
 
 chicago_map <- chicago_map %>%
   mutate(gentrification = ifelse(index >= 4, 1, 0))
@@ -507,7 +507,7 @@ glimpse(chicago_map)
 
 ggplot(chicago_map) +
   geom_sf(aes(fill = as.factor(gentrification)), colour = NA) +  
-  facet_wrap(~ Year) +  # 按年份分组显示
+  facet_wrap(~ Year) + 
   scale_fill_manual(values = c("0" = "red", "1" = "blue"), 
                     labels = c("0" = "Non-Gentrified", "1" = "Gentrified"), 
                     name = "Gentrification Status") +  
