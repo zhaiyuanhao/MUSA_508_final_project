@@ -3,7 +3,7 @@ In this program, we will develop software to predict the gentrification of city 
 
 # Documents Explanation
 In this repository, there are two documents for the final project:
-Gentrification_Prediction_Model_Report_Yuanhao_Jiewen.pdf{https://github.com/zhaiyuanhao/MUSA_508_final_project/blob/main/Gentrification_Prediction_Model_Report_Yuanhao_Jiewen.pdf}
+Gentrification_Prediction_Model_Report_Yuanhao_Jiewen.pdf[https://github.com/zhaiyuanhao/MUSA_508_final_project/blob/main/Gentrification_Prediction_Model_Report_Yuanhao_Jiewen.pdf]
 This report is for the director of Smart Cities, you can find the research process of our model, including an explanation of the methodology, results of the model testing, and recommendations for implementation.
 
 technical documents from R markdown [https://github.com/zhaiyuanhao/MUSA_508_final_project/blob/main/MUSA508_final_Yuanhao_Jiewen.html]
