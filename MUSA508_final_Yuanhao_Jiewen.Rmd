@@ -213,7 +213,8 @@ chicagoCensus90 <- data90 %>%
          Median_House_Value = MHMVAL90,
          Median_Rent = MRENT90,
          Below_Poverty_Pop = NPOV90,
-         
+         Professional_Employeed = PROF90,
+          Total_Employeed = EMPCLF90,
          Female_Households = FHH90,
          Total_Households = FAMILY90,
          Median_Housedhold_Income = HINC90,
@@ -253,7 +254,8 @@ chicagoCensus00 <- data00 %>%
          Median_House_Value = MHMVAL00,
          Median_Rent = MRENT00,
          Below_Poverty_Pop = NPOV00,
-        
+        Professional_Employeed = PROF00,
+          Total_Employeed = EMPCLF00,
        
          Female_Households = FHH00,
          Total_Households = FAMILY00,
@@ -595,6 +597,7 @@ ggplot(chicago_map_risk) +
   labs(title = "Areas where is facing Gentrification in Chicago (1990-2010)") +  
   theme_void()  
 ```
+
 ## 3.4. Data Explore
 
 After calculate the variables change, we explored the relation between the dependency gentrification index and independent variables:
