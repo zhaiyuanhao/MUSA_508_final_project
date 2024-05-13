@@ -1,12 +1,17 @@
 # MUSA_508_final_project
 In this program, we will develop software to predict the gentrification of city areas.
 
+# Documents Explanation
+In this repository, there are two documents for the final project:
+Gentrification_Prediction_Model_Report_Yuanhao_Jiewen.pdf[https://github.com/zhaiyuanhao/MUSA_508_final_project/blob/main/Gentrification_Prediction_Model_Report_Yuanhao_Jiewen.pdf]
+This report is for the director of Smart Cities, you can find the research process of our model, including an explanation of the methodology, results of the model testing, and recommendations for implementation.
+
+technical documents from R markdown [https://github.com/zhaiyuanhao/MUSA_508_final_project/blob/main/MUSA508_final_Yuanhao_Jiewen.html]
+This file is the model developing process, including the data collecting process, index calculating process, model building, model testing, and validation process.
+
 # Study Areas
 We will train the prediction model by using the data from the Chicago Data Portal.
 And test the model on the Philadelphia.
-
-# Research & Gentrification Define
-
 
 # Data Collecting 
 **1 socioeconomic factor changes**:
@@ -29,10 +34,11 @@ Coffee shop numbers,
 Number of restaurants, grocery stores, parks nearby,
 education facilities numbers nearby,
 
-*Data Source*: Census tract boundaries change over time. If you want to use census tracts, consider the NHGIS (For which there is an R package) or the Longitudinal Tract Database (you can download longitudinal decennial census data freely from their website).
+*Data Source*: Longitudinal Tract Database[https://s4.ad.brown.edu/Projects/Diversity/Researcher/Bridging.htm]
 
 # Model Selecting
-Maybe Logistic Regression? The predicted result will be 0 or 1.
+We use a logistic regression model, The predicted result will be 0 or 1.
+A detailed explanation will be provided in the report[https://github.com/zhaiyuanhao/MUSA_508_final_project/blob/main/Gentrification_Prediction_Model_Report_Yuanhao_Jiewen.pdf].
 
 # Final Public Report
 
