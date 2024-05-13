@@ -189,7 +189,7 @@ chicagoCensus80 <- data80 %>%
     Pt_Children = (Children_Pop / Total_Pop) * 100,  # % Children (Age <18)
     Pt_College = College_Pop / Total_Pop * 100,
     Pt_Owner_Occupied = Owner_Occupied / Total_housing_units * 100,  
-    Median_House_Value_Adjusted = Median_House_Value * 2.72,  # Median House Value, adjust for inflation
+    Median_House_Value_Adjusted = Median_House_Value * 2.72,  # Median House Value, adjust for inflation, https://www.bls.gov/data/inflation_calculator.htm
     Median_Rent_Adjusted = Median_Rent * 2.727, # Median Rent Value, adjust for inflation
     Pt_Below_Poverty = Below_Poverty_Pop / Total_Pop * 100,
     Pt_Female_Households = Female_Households / Total_Households * 100,
@@ -213,8 +213,7 @@ chicagoCensus90 <- data90 %>%
          Median_House_Value = MHMVAL90,
          Median_Rent = MRENT90,
          Below_Poverty_Pop = NPOV90,
-         Professional_Employeed = PROF90,
-         Total_Employeed = EMPCLF90,
+         
          Female_Households = FHH90,
          Total_Households = FAMILY90,
          Median_Housedhold_Income = HINC90,
@@ -254,8 +253,8 @@ chicagoCensus00 <- data00 %>%
          Median_House_Value = MHMVAL00,
          Median_Rent = MRENT00,
          Below_Poverty_Pop = NPOV00,
-         Professional_Employeed = PROF00,
-         Total_Employeed = EMPCLF00,
+        
+       
          Female_Households = FHH00,
          Total_Households = FAMILY00,
          Median_Housedhold_Income = HINC00,
