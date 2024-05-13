@@ -518,6 +518,313 @@ ggplot(chicago_map) +
 ```
 
 
+## 3.1 Census Data for Philadelphia from 2000-2010
+
+
+```{r PhillyCensus00}
+phillyCensus00 <- data00 %>%
+  filter(county.x == "Philadelphia County" & state.x == "PA")%>%
+
+  rename(Total_Pop = POP00,
+         White_Pop = NHWHT00,
+         Black_Pop = NHBLK00,
+         Latino_Pop = HISP00,
+         Elder_Pop = A60UP00,
+         Children_Pop = A18UND00,
+         College_Pop = COL00,
+         Owner_Occupied = OWN00,
+         Total_housing_units = HU00,
+         Vacant_housing_units = VAC00,
+         Median_House_Value = MHMVAL00,
+         Median_Rent = MRENT00,
+         Below_Poverty_Pop = NPOV00,
+        
+       
+         Female_Households = FHH00,
+         Total_Households = FAMILY00)%>%
+  
+  select(TRTID10, Total_Pop, White_Pop, Black_Pop, Latino_Pop, Elder_Pop, Children_Pop, College_Pop, Owner_Occupied, Median_House_Value, Median_Rent, Below_Poverty_Pop, Female_Households, Total_Households, Total_housing_units, Vacant_housing_units)%>%
+  
+  mutate(
+    Pt_White = White_Pop / Total_Pop * 100, 
+    Pt_Black = Black_Pop / Total_Pop * 100, 
+    Pt_Latino = Latino_Pop / Total_Pop * 100,  
+    Pt_Elderly = Elder_Pop / Total_Pop * 100,  # % Elderly (Age 75+)
+    Pt_Children = (Children_Pop / Total_Pop) * 100,  # % Children (Age <18)
+    Pt_College = College_Pop / Total_Pop * 100,
+    Pt_Owner_Occupied = Owner_Occupied / Total_housing_units * 100,  
+    Median_House_Value_Adjusted = Median_House_Value * 1.27,  # Median House Value, adjust for inflation
+    Median_Rent_Adjusted = Median_Rent * 1.27, # Median Rent Value, adjust for inflation
+    Pt_Below_Poverty = Below_Poverty_Pop / Total_Pop * 100,
+    Pt_Female_Households = Female_Households / Total_Households * 100,
+    Pt_Vacant = Vacant_housing_units / Total_housing_units * 100
+       
+  )
+ 
+
+```
+
+```{r}
+glimpse(phillyCensus00)
+```
+
+
+```{r get_census10, message=FALSE, warning=FALSE, cache=TRUE, results = 'hide'}
+phillyCensus10a <- 
+  get_acs(geography = "tract", 
+          variables = c("B01003_001", "B02009_001", 
+                        "B02001_002", "B03001_003",
+                        "B06001_012", "B09001_001", 
+                        "B06009_005","B07013_002",
+                        "B25001_001", "B25004_001",
+                        "B25077_001", "B25064_001",
+                        "B17001_002", "B24011_001",
+                        	"B11005_002","B11001_001"), #"B23006_027", "B23006_013", "B23006_006", "B23006_020",
+          year = 2010, 
+          state = "PA", 
+          geometry = TRUE, 
+          county=c("Philadelphia"),
+          output = "wide") %>%
+  
+  rename(College_Pop = B06009_005E,
+         Median_House_Value = B25077_001E,
+         Median_Rent = B25064_001E,
+         Below_Poverty_Pop = B17001_002E,
+         )%>%
+  
+  mutate(TRTID10 = as.numeric(GEOID))
+
+```
+
+```{r phillyCensus10}
+phillyCensus10b <- data10 %>%
+  filter(county == "Philadelphia County" & state == "PA")%>%
+
+  rename(TRTID10= tractid,
+    Total_Pop = pop10,
+         White_Pop = nhwht10,
+         Black_Pop = nhblk10,
+         Latino_Pop = hisp10,
+         Elder_Pop = a60up10,
+         Children_Pop = a18und10,
+         Owner_Occupied = own10,
+         Total_housing_units = hu10,
+         Vacant_housing_units = vac10,
+         Female_Households = fhh10,
+         Total_Households = family10)
+```
+
+```{r phillyCensus10}
+#College_Pop = COL00,Median_House_Value = MHMVAL00,Median_Rent = MRENT00,Below_Poverty_Pop = NPOV00,
+phillyCensus10 <- phillyCensus10a %>%
+  inner_join(phillyCensus10b,by ="TRTID10")%>%
+
+
+  select(TRTID10, Total_Pop, White_Pop, Black_Pop, Latino_Pop, Elder_Pop, Children_Pop, College_Pop, Owner_Occupied, Median_House_Value, Median_Rent, Below_Poverty_Pop, Female_Households, Total_Households, Total_housing_units, Vacant_housing_units)%>%
+  
+  mutate(
+    Pt_White = White_Pop / Total_Pop * 100, 
+    Pt_Black = Black_Pop / Total_Pop * 100, 
+    Pt_Latino = Latino_Pop / Total_Pop * 100,  
+    Pt_Elderly = Elder_Pop / Total_Pop * 100,  # % Elderly (Age 60+)
+    Pt_Children = (Children_Pop / Total_Pop) * 100,  # % Children (Age <18)
+    Pt_College = College_Pop / Total_Pop * 100,
+    Pt_Owner_Occupied = Owner_Occupied / Total_housing_units * 100,  
+    Median_House_Value_Adjusted = Median_House_Value,  # Median House Value, adjust for inflation
+    Median_Rent_Adjusted = Median_Rent, # Median Rent Value, adjust for inflation
+    Pt_Below_Poverty = Below_Poverty_Pop / Total_Pop * 100,
+    Pt_Female_Households = Female_Households / Total_Households * 100,
+    Pt_Vacant = Vacant_housing_units / Total_housing_units * 100
+       
+  )
+ 
+
+```
+
+
+
+```{r}
+glimpse(phillyCensus10)
+```
+
+
+```{r extract_geometries }
+phillyTracts <- 
+  phillyCensus10 %>%
+  as.data.frame() %>%
+  distinct(TRTID10, .keep_all = TRUE) %>%
+  select(TRTID10, geometry) %>% 
+  st_sf
+```
+
+
+```{r combine data}
+
+phillyCensus00 <- phillyCensus00 %>% mutate(Year = 2000)
+phillyCensus10 <- phillyCensus10 %>% mutate(Year = 2010)
+
+philly_data <- bind_rows(phillyCensus00, phillyCensus10)
+```
+
+
+## 3.2. Calculate City Averages in Philadelphia
+
+```{r philly_average}
+philly_averages <- philly_data %>%
+  group_by(Year) %>%
+  summarise(
+    Total_Pop = sum(Total_Pop, na.rm = TRUE),
+    White_Pop = sum(White_Pop, na.rm = TRUE),
+    Black_Pop = sum(Black_Pop, na.rm = TRUE),
+    Latino_Pop = sum(Latino_Pop, na.rm = TRUE),
+    Elder_Pop = sum(Elder_Pop, na.rm = TRUE),
+    Children_Pop = sum(Children_Pop, na.rm = TRUE),
+    College_Pop = sum(College_Pop, na.rm = TRUE),
+    Owner_Occupied = sum(Owner_Occupied, na.rm = TRUE),
+    Below_Poverty_Pop = sum(Below_Poverty_Pop, na.rm = TRUE),
+    Female_Households = sum(Female_Households, na.rm = TRUE),
+    Total_Households = sum(Total_Households, na.rm = TRUE),
+    Vacant_housing_units = sum(Vacant_housing_units, na.rm = TRUE),
+    Total_housing_units = sum(Total_housing_units, na.rm = TRUE),
+    Median_House_Value_Adjusted = median(Median_House_Value_Adjusted, na.rm = TRUE),
+    Median_Rent_Adjusted = median(Median_Rent_Adjusted, na.rm = TRUE)
+  )%>%
+  
+  mutate(Pt_White = (White_Pop / Total_Pop) * 100,
+         Pt_Black = Black_Pop / Total_Pop * 100, 
+    Pt_Latino = Latino_Pop / Total_Pop * 100,  
+    Pt_Elderly = Elder_Pop / Total_Pop * 100,  # % Elderly (Age 60+)
+    Pt_Children = (Children_Pop / Total_Pop) * 100,  # % Children (Age <18)
+    Pt_College = College_Pop / Total_Pop * 100,
+    Pt_Owner_Occupied = Owner_Occupied / Total_housing_units * 100,  
+    Pt_Below_Poverty = Below_Poverty_Pop / Total_Pop * 100,
+    Pt_Female_Households = Female_Households / Total_Households * 100,
+    Pt_Vacant = Vacant_housing_units / Total_housing_units * 100
+         )%>%
+select(Year, Pt_White,Pt_Black,Pt_Latino,Pt_Elderly,Pt_Children,Pt_College,Pt_Owner_Occupied,Pt_Below_Poverty,Pt_Female_Households,Pt_Vacant,Median_House_Value_Adjusted,Median_Rent_Adjusted)
+```
+
+```{r}
+styled_table <- kable(philly_averages, format = "html", digits = 2, 
+                      caption = "Summary Statistics by Year", booktabs = TRUE) %>%
+  kable_styling(full_width = FALSE) %>%
+  add_header_above(c(" " = 1, "Summary Statistics" = 11, " " = 1), font_size = 15)
+
+styled_table
+```
+
+
+
+```{r exploratory_continuous_density, fig.width=10, message=FALSE, warning=FALSE}
+philly_averages %>%
+  tidyr::pivot_longer(cols = -Year, names_to = "Variable", values_to = "value") %>%
+  ggplot() + 
+  geom_bar(aes(x = Year, y = value), stat = "identity") + 
+  facet_wrap(~Variable, scales = "free", ncol = 4) +
+  scale_fill_manual(values = palette2) +
+  labs(x="Year", y="Value",
+       title = "Feature Distribution with the Likelihood of Gentrification from 2000-2010",
+       subtitle = "(City Averages in Philadelphia)") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+
+```
+
+## 3.3. Calculate Gentrification Index from 2000-2010 in Philadelphia
+
+Variable Score Assignments:
+Variables Type of Association
+% White (Non-Hispanic) Above City Average, Positive (+1)
+% Black Above City Average, Negative (-1)
+% Latino Above City Average, Negative (-1)
+% Elderly (Age 65+) Above City Average, Negative (-1)
+% Children (Age 5-19) Above City Average, Negative (-1)
+% College Education (Bachelor’s degree or higher) Above City Average, Positive (+1)
+Median House Value (Adjusted for inflation) Above City Average, Positive (+1)
+Median Rent (Adjusted for inflation) Above City Average, Positive (+1)
+% Owner Occupied Above City Average, Positive (+1)
+% Families Below Poverty Above City Average, Negative (-1)
+% Female Households with Children Above City Average, Negative (-1)
+% Vacant Housing Units Above City Average, Negative (-1)
+
+
+```{r}
+philly_data <- philly_data%>%
+  select(Year,TRTID10, Pt_White,Pt_Black,Pt_Latino,Pt_Elderly,Pt_Children,Pt_College,Pt_Owner_Occupied,Pt_Below_Poverty,Pt_Female_Households,Pt_Vacant,Median_House_Value_Adjusted,Median_Rent_Adjusted)
+
+```
+
+```{r gentrification index}
+calculate_index <- function(row, averages) {
+  variables <- c("Pt_White", "Pt_Black", "Pt_Latino", "Pt_Elderly", "Pt_Children",
+                 "Pt_College", "Median_House_Value_Adjusted", "Median_Rent_Adjusted",
+                 "Pt_Owner_Occupied", "Pt_Below_Poverty", "Pt_Female_Households", "Pt_Vacant")
+  
+  scores <- c(1, -1, -1, -1, -1, 1, 1, 1, 1, -1, -1, -1)
+  
+  year_avg <- averages %>% filter(Year == row["Year"]) %>% select(variables) %>% unlist()
+
+  score <- sum((row[variables] > year_avg) * scores)
+  
+  return(score)
+}
+
+philly_data$index <- apply(philly_data, 1, function(row) calculate_index(row, philly_averages))
+
+head(philly_data)
+
+```
+
+
+```{r philly gentrification index map}
+philly_map <- phillyTracts %>% 
+  left_join(philly_data, by = "TRTID10")%>%
+  st_as_sf()
+```
+
+
+```{r philly gentrification index map}
+
+library(scales)
+
+ggplot(philly_map) +
+  geom_sf(aes(fill = index), colour = "white", size = 0.1) + 
+  facet_wrap(~ Year) +  
+  scale_fill_gradient(name = "Gentrification Index", low = "red", high = "blue", 
+                      breaks = pretty_breaks(n = 5)) +  
+  labs(title = "Gentrification Index Map in Philadelphia (2000-2010)",
+       caption = "Data source:  2000 and 2010 Decennial Census (LTDB); 2008-2012 Five-Year American Community Survey ") +  
+  theme_void() +  
+  theme(legend.position = "bottom",  
+        legend.title.align = 0.5,  
+        plot.title = element_text(size = 14), 
+        plot.caption = element_text(size = 8),  
+        legend.text = element_text(size = 10)) 
+
+```
+
+```{r philly gentrification binary dataset}
+# gentrification index threshold-4
+
+philly_map <- philly_map %>%
+  mutate(gentrification = ifelse(index >= 4, 1, 0))
+glimpse(philly_map)
+```
+
+```{r philly gentrification binary map}
+
+ggplot(philly_map) +
+  geom_sf(aes(fill = as.factor(gentrification)), colour = NA) +  
+  facet_wrap(~ Year) +  
+  scale_fill_manual(values = c("0" = "red", "1" = "blue"), 
+                    labels = c("0" = "Non-Gentrified", "1" = "Gentrified"), 
+                    name = "Gentrification Status") +  
+  labs(title = "Gentrification Index Map in Philadelphia (2000-2010)") +  
+  theme_void()  
+
+
+```
 
 
 
