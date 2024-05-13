@@ -36,6 +36,8 @@ education facilities numbers nearby,
 
 *Data Source*: Longitudinal Tract Database[https://s4.ad.brown.edu/Projects/Diversity/Researcher/Bridging.htm]
 
+As the origin data source is a CSV file and is relatively too big for GitHub, we upload it to Google Drive [https://drive.google.com/drive/folders/1aZz5VturUT16XdLHVo5vjK1Wll4uYksa?usp=sharing]
+
 # Model Selecting
 We use a logistic regression model, The predicted result will be 0 or 1.
 A detailed explanation will be provided in the report[https://github.com/zhaiyuanhao/MUSA_508_final_project/blob/main/Gentrification_Prediction_Model_Report_Yuanhao_Jiewen.pdf].
