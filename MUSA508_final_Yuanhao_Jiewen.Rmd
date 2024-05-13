@@ -10,16 +10,20 @@ output:
     code_download: true
 ---
 
-## 1.1. Introduction
+# 1 Introduction
+
+Gentrification is a common process in urban development. Although the accompanying effect of gentrification may benefit the residents by improving amenities and providing job opportunities, it may also carry steep costs for residents who cannot afford to stay in the neighborhood due to increased rent or other reasons. In this context, identifying gentrified areas allows the city to get ahead and allocate additional funds to save the living environment of neighborhood residents. 
+
+In this final project, our team developed a predicating model to help the city government identify areas at risk of gentrification using the gentrification index. In the following article, I will introduce three parts of our project including the measure of defining gentrification, the model development process, and the model validation on other major cities of the US.
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
-## 2.1. Setup
-
 ```{r setup_13, cache=TRUE, message=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 library(tidyverse)
 library(sf)
 library(lubridate)
@@ -33,6 +37,12 @@ library(kableExtra)
 library(RSocrata)
 library(ggplot2)
 library(dplyr)
+library(pscl)
+library(plotROC)
+library(pROC)
+library(lubridate)
+library(DT)
+library(caret)
 
 plotTheme <- theme(
   plot.title =element_text(size=12),
@@ -71,47 +81,86 @@ mapTheme <- theme(plot.title =element_text(size=12),
 palette5 <- c("#981FAC","#CB0F8B","#FF006A","#FE4C35","#FE9900")
 palette4 <- c("#981FAC","#FF006A","#FE4C35","#FE9900")
 palette2 <- c("#981FAC","#FF006A")
-
 ```
 
-```{r install_census_API_key, warning = FALSE, include=FALSE, eval = TRUE}
+# 2 Literature Review
+
+Since the early 2000s, a large number of literature has examined the definition and potential causes of gentrification. The U.S. Department of Housing and Urban Development (HUD) defines gentrification as “a form of neighborhood change that occurs when high-income groups move to low-income areas, potentially altering the cultural and financial landscape of the original neighborhood”. Previous researches emphasize the changing neighborhood’s socioeconomic characteristics in terms of demographics, land use, and housing affordability,  which is caused by the inflow of upper-class migration (Lees et al., 2008). Some literature also suggests that property renovation can be a major indicator of gentrification (Mayer, 1981). So, in this project, in order to determine the risk of gentrification, we will focus on the changing of neighborhoods’ demographics, housing market, and the number of amenities. 
+
+# 3 Measure Gentrification & Data Selecting
+
+With the rising attention to gentrification, the quantitative measurements of gentrification become an important issue in the research field. The Gentrification Index which contains multi-related variables was developed as an important determinant of a neighborhood’s socioeconomic status with regard to gentrification *(Gentrification Index | Nathalie P. Voorhees Center for Neighborhood and Community Improvement | University of Illinois Chicago, n.d.)*. The literature for predicting which residents and neighborhoods will be affected by gentrification uses this index as an indicator variable for model building (Bureau, n.d.). So, in this project, to better measure the gentrification of areas, we will use the Gentrification Index as an essential indicator of the gentrification. The model dependency will be the changing level of the index. The areas with a higher increase in the gentrification index are facing more risk of being gentrified.
+
+Gentrification Index Variable Score Assignments:
+
+Variables Type of Association
+
+% White (Non-Hispanic) Above City Average, Positive (+2)
+
+% Black Above City Average, Negative (-1)
+
+% Latino Above City Average, Negative (-1)
+
+% Elderly (Age 65+) Above City Average, Negative (-1)
+
+% Children (Age 5-19) Above City Average, Negative (-1)
+
+% College Education (Bachelor’s degree or higher) Above City Average, Positive (+2)
+
+Median House Value (Adjusted for inflation) Above City Average, Positive (+2)
+
+Median Rent (Adjusted for inflation) Above City Average, Positive (+2)
+
+% Owner Occupied Above City Average, Positive (+1)
+
+% Families Below Poverty Above City Average, Negative (-1)
+
+% Female Households with Children Above City Average, Negative (-1)
+
+% Vacant Housing Units Above City Average, Negative (-1)
+
+For the independent variable used to predict the future risk, we use the following variables:
+
+*Socioeconomic indicators*: median income changes, education level composition changes, age composition changes, family type changes, marriage status, tenure status, median housing price, ethnicity composition.
+
+*Housing Characteristics*: building types, building year, housing condition.
+
+*Local Amenity*: Coffee shop numbers, Number of restaurants, grocery stores, parks nearby, education facilities numbers nearby.
+
+## 3.1. Collecting Data for Prediction
+
+The data we use here will be collected from the Census Bureau, and the Longitudinal Tract Database will be our database since our model will develop under census tracts scale, and LTDB can help us convert the previous data into 2010 scale format. The data from Chicago will be used for the training model, and the data from Philadelphia will be used for model validation.
+
+So, the data table will show as follows:
+
+```{r import_api, message=FALSE, warning=FALSE, include=FALSE}
 # Install Census API Key
 tidycensus::census_api_key("e79f3706b6d61249968c6ce88794f6f556e5bf3d", overwrite = TRUE)
 ```
 
-## 2.2. Import Census Info
 
-```{r get_census, message=FALSE, warning=FALSE, cache=TRUE, results = 'hide'}
-fullcount80 <- read.csv("D:/Upenn/006/CPLN5920/final/ltdb_std_all_fullcount/LTDB_Std_1980_fullcount.csv")
+```{r import_data, message=FALSE, warning=FALSE, results='hide'}
+fullcount80 <- read.csv("C:/Users/zhaiy/Desktop/5080/Final_Project/ltdb_std_all_fullcount-20240511T210226Z-001/ltdb_std_all_fullcount/LTDB_Std_1980_fullcount.csv")
 
-sample80 <- read.csv("D:/Upenn/006/CPLN5920/final/LTDB_Std_All_Sample/ltdb_std_all_sample/ltdb_std_1980_sample.csv")
+sample80 <- read.csv("C:/Users/zhaiy/Desktop/5080/Final_Project/LTDB_Std_All_Sample-20240511T210214Z-001/LTDB_Std_All_Sample/ltdb_std_all_sample/ltdb_std_1980_sample.csv")
 
 sample80 <- rename(sample80, TRTID10 = trtid10)
 
 data80 <- merge(fullcount80, sample80, by = "TRTID10")
 
 
-fullcount90 <- read.csv("D:/Upenn/006/CPLN5920/final/ltdb_std_all_fullcount/LTDB_Std_1990_fullcount.csv")
-sample90 <- read.csv("D:/Upenn/006/CPLN5920/final/LTDB_Std_All_Sample/ltdb_std_all_sample/ltdb_std_1990_sample.csv")
+fullcount90 <- read.csv("C:/Users/zhaiy/Desktop/5080/Final_Project/ltdb_std_all_fullcount-20240511T210226Z-001/ltdb_std_all_fullcount/LTDB_Std_1990_fullcount.csv")
+sample90 <- read.csv("C:/Users/zhaiy/Desktop/5080/Final_Project/LTDB_Std_All_Sample-20240511T210214Z-001/LTDB_Std_All_Sample/ltdb_std_all_sample/ltdb_std_1990_sample.csv")
 data90 <- merge(fullcount90, sample90, by = "TRTID10")
 
-fullcount00 <- read.csv("D:/Upenn/006/CPLN5920/final/ltdb_std_all_fullcount/LTDB_Std_2000_fullcount.csv")
-sample00 <- read.csv("D:/Upenn/006/CPLN5920/final/LTDB_Std_All_Sample/ltdb_std_all_sample/ltdb_std_2000_sample.csv")
+fullcount00 <- read.csv("C:/Users/zhaiy/Desktop/5080/Final_Project/ltdb_std_all_fullcount-20240511T210226Z-001/ltdb_std_all_fullcount/LTDB_Std_2000_fullcount.csv")
+sample00 <- read.csv("C:/Users/zhaiy/Desktop/5080/Final_Project/LTDB_Std_All_Sample-20240511T210214Z-001/LTDB_Std_All_Sample/ltdb_std_all_sample/ltdb_std_2000_sample.csv")
 data00 <- merge(fullcount00, sample00, by = "TRTID10")
 
-data10 <- read.csv("D:/Upenn/006/CPLN5920/final/ltdb_std_all_fullcount/LTDB_Std_2010_fullcount.csv")
-```
+data10 <- read.csv("C:/Users/zhaiy/Desktop/5080/Final_Project/ltdb_std_all_fullcount-20240511T210226Z-001/ltdb_std_all_fullcount/LTDB_Std_2010_fullcount.csv")
 
-```{r}
-glimpse(data10)
-```
-
-
-
-```{r ChicagoCensus80}
 chicagoCensus80 <- data80 %>%
   filter(county.x == "Cook County" & state.x == "IL")%>%
-
   rename(Total_Pop = POP80,
          White_Pop = NHWHT80,
          Black_Pop = NHBLK80,
@@ -122,14 +171,16 @@ chicagoCensus80 <- data80 %>%
          Owner_Occupied = OWN80, #  Owner Occupied
          Total_housing_units = HU80,
          Vacant_housing_units = VAC80,
+         Professional_Employeed = prof80,
+         Total_Employeed = empclf80,
          Median_House_Value = MHMVAL80,
          Median_Rent = MRENT80,
          Below_Poverty_Pop = npov80,
          Female_Households = fhh80,
-         Total_Households = family80)%>%
-  
-  select(TRTID10, Total_Pop, White_Pop, Black_Pop, Latino_Pop, Elder_Pop, Children_Pop, College_Pop, Owner_Occupied, Median_House_Value, Median_Rent, Below_Poverty_Pop, Female_Households, Total_Households, Total_housing_units, Vacant_housing_units)%>%  
-  
+         Total_Households = family80,
+         Median_Housedhold_Income = hinc80,
+         Currently_Married = MAR80)%>%
+  dplyr::select(TRTID10, Total_Pop, White_Pop, Black_Pop, Latino_Pop, Elder_Pop, Children_Pop, College_Pop, Owner_Occupied, Median_House_Value, Median_Rent, Below_Poverty_Pop, Professional_Employeed, Total_Employeed, Female_Households, Total_Households, Total_housing_units, Vacant_housing_units,Median_Housedhold_Income,Currently_Married)%>%  
   mutate(
     Pt_White = White_Pop / Total_Pop * 100, 
     Pt_Black = Black_Pop / Total_Pop * 100, 
@@ -142,18 +193,10 @@ chicagoCensus80 <- data80 %>%
     Median_Rent_Adjusted = Median_Rent * 2.727, # Median Rent Value, adjust for inflation
     Pt_Below_Poverty = Below_Poverty_Pop / Total_Pop * 100,
     Pt_Female_Households = Female_Households / Total_Households * 100,
-    Pt_Vacant = Vacant_housing_units / Total_housing_units * 100
+    Pt_Vacant = Vacant_housing_units / Total_housing_units * 100,
+    Median_Housedhold_Income_Adjusted = Median_Housedhold_Income * 2.72
     )
-```
 
-
-  
-```{r}
-glimpse(chicagoCensus80)
-```
-
-
-```{r ChicagoCensus90}
 chicagoCensus90 <- data90 %>%
   filter(county.x == "Cook County" & state.x == "IL")%>%
 
@@ -173,9 +216,11 @@ chicagoCensus90 <- data90 %>%
          Professional_Employeed = PROF90,
          Total_Employeed = EMPCLF90,
          Female_Households = FHH90,
-         Total_Households = FAMILY90)%>%
+         Total_Households = FAMILY90,
+         Median_Housedhold_Income = HINC90,
+         Currently_Married = MAR90)%>%
   
-  select(TRTID10, Total_Pop, White_Pop, Black_Pop, Latino_Pop, Elder_Pop, Children_Pop, College_Pop, Owner_Occupied, Median_House_Value, Median_Rent, Below_Poverty_Pop, Professional_Employeed, Total_Employeed, Female_Households, Total_Households, Total_housing_units, Vacant_housing_units)%>%
+  dplyr::select(TRTID10, Total_Pop, White_Pop, Black_Pop, Latino_Pop, Elder_Pop, Children_Pop, College_Pop, Owner_Occupied, Median_House_Value, Median_Rent, Below_Poverty_Pop, Professional_Employeed, Total_Employeed, Female_Households, Total_Households, Total_housing_units, Vacant_housing_units,Median_Housedhold_Income,Currently_Married)%>%
   
   mutate(
     Pt_White = White_Pop / Total_Pop * 100, 
@@ -189,20 +234,13 @@ chicagoCensus90 <- data90 %>%
     Median_Rent_Adjusted = Median_Rent * 1.69, # Median Rent Value, adjust for inflation
     Pt_Below_Poverty = Below_Poverty_Pop / Total_Pop * 100,
     Pt_Female_Households = Female_Households / Total_Households * 100,
-    Pt_Vacant = Vacant_housing_units / Total_housing_units * 100
-     )
+    Pt_Vacant = Vacant_housing_units / Total_housing_units * 100,
+    Median_Housedhold_Income_Adjusted = Median_Housedhold_Income * 1.69
+    )
   
 
-```
-
-```{r}
-glimpse(chicagoCensus90)
-```
-
-```{r ChicagoCensus00}
 chicagoCensus00 <- data00 %>%
   filter(county.x == "Cook County" & state.x == "IL")%>%
-
   rename(Total_Pop = POP00,
          White_Pop = NHWHT00,
          Black_Pop = NHBLK00,
@@ -219,10 +257,10 @@ chicagoCensus00 <- data00 %>%
          Professional_Employeed = PROF00,
          Total_Employeed = EMPCLF00,
          Female_Households = FHH00,
-         Total_Households = FAMILY00)%>%
-  
-  select(TRTID10, Total_Pop, White_Pop, Black_Pop, Latino_Pop, Elder_Pop, Children_Pop, College_Pop, Owner_Occupied, Median_House_Value, Median_Rent, Below_Poverty_Pop, Professional_Employeed, Total_Employeed, Female_Households, Total_Households, Total_housing_units, Vacant_housing_units)%>%
-  
+         Total_Households = FAMILY00,
+         Median_Housedhold_Income = HINC00,
+         Currently_Married = Mar.00)%>%
+  dplyr::select(TRTID10, Total_Pop, White_Pop, Black_Pop, Latino_Pop, Elder_Pop, Children_Pop, College_Pop, Owner_Occupied, Median_House_Value, Median_Rent, Below_Poverty_Pop, Professional_Employeed, Total_Employeed, Female_Households, Total_Households, Total_housing_units, Vacant_housing_units,Median_Housedhold_Income,Currently_Married)%>%
   mutate(
     Pt_White = White_Pop / Total_Pop * 100, 
     Pt_Black = Black_Pop / Total_Pop * 100, 
@@ -235,29 +273,11 @@ chicagoCensus00 <- data00 %>%
     Median_Rent_Adjusted = Median_Rent * 1.27, # Median Rent Value, adjust for inflation
     Pt_Below_Poverty = Below_Poverty_Pop / Total_Pop * 100,
     Pt_Female_Households = Female_Households / Total_Households * 100,
-    Pt_Vacant = Vacant_housing_units / Total_housing_units * 100
-       
+    Pt_Vacant = Vacant_housing_units / Total_housing_units * 100,
+    Median_Housedhold_Income_Adjusted = Median_Housedhold_Income * 1.27
   )
  
 
-```
-
-```{r}
-glimpse(chicagoCensus00)
-```
-
-
-
-
-
-
-```{r}
-# 载入2019年ACS 5-year survey的变量
-vars <- load_variables(2010, "acs5", cache = TRUE)
-View(vars)
-```
-
-```{r get_census10, message=FALSE, warning=FALSE, cache=TRUE, results = 'hide'}
 chicagoCensus10a <- 
   get_acs(geography = "tract", 
           variables = c("B01003_001", "B02009_001", 
@@ -267,7 +287,9 @@ chicagoCensus10a <-
                         "B25001_001", "B25004_001",
                         "B25077_001", "B25064_001",
                         "B17001_002", "B24011_001",
-                        	"B11005_002","B11001_001"), #"B23006_027", "B23006_013", "B23006_006", "B23006_020",
+                        	"B11005_002","B11001_001",
+                        "C24010_003","C24010_001",
+                        "B19013_001","B12001_001"), #"B23006_027", "B23006_013", "B23006_006", "B23006_020",
           year = 2010, 
           state = "IL", 
           geometry = TRUE, 
@@ -278,13 +300,14 @@ chicagoCensus10a <-
          Median_House_Value = B25077_001E,
          Median_Rent = B25064_001E,
          Below_Poverty_Pop = B17001_002E,
+         Professional_Employeed = C24010_003E,
+         Total_Employeed = C24010_001E,
+         Median_Housedhold_Income = B19013_001E,
+         Currently_Married = B12001_001E
          )%>%
   
   mutate(TRTID10 = as.numeric(GEOID))
 
-```
-
-```{r ChicagoCensus10}
 chicagoCensus10b <- data10 %>%
   filter(county == "Cook County" & state == "IL")%>%
 
@@ -300,15 +323,12 @@ chicagoCensus10b <- data10 %>%
          Vacant_housing_units = vac10,
          Female_Households = fhh10,
          Total_Households = family10)
-```
 
-```{r ChicagoCensus10}
 #College_Pop = COL00,Median_House_Value = MHMVAL00,Median_Rent = MRENT00,Below_Poverty_Pop = NPOV00,
 chicagoCensus10 <- chicagoCensus10a %>%
   inner_join(chicagoCensus10b,by ="TRTID10")%>%
-
-
-  select(TRTID10, Total_Pop, White_Pop, Black_Pop, Latino_Pop, Elder_Pop, Children_Pop, College_Pop, Owner_Occupied, Median_House_Value, Median_Rent, Below_Poverty_Pop, Female_Households, Total_Households, Total_housing_units, Vacant_housing_units)%>%
+  
+  dplyr::select(TRTID10, Total_Pop, White_Pop, Black_Pop, Latino_Pop, Elder_Pop, Children_Pop, College_Pop, Owner_Occupied, Median_House_Value, Median_Rent, Below_Poverty_Pop, Professional_Employeed, Total_Employeed, Female_Households, Total_Households, Total_housing_units, Vacant_housing_units,Median_Housedhold_Income,Currently_Married)%>%
   
   mutate(
     Pt_White = White_Pop / Total_Pop * 100, 
@@ -322,43 +342,56 @@ chicagoCensus10 <- chicagoCensus10a %>%
     Median_Rent_Adjusted = Median_Rent, # Median Rent Value, adjust for inflation
     Pt_Below_Poverty = Below_Poverty_Pop / Total_Pop * 100,
     Pt_Female_Households = Female_Households / Total_Households * 100,
-    Pt_Vacant = Vacant_housing_units / Total_housing_units * 100
+    Pt_Vacant = Vacant_housing_units / Total_housing_units * 100,
+    Median_Housedhold_Income_Adjusted = Median_Housedhold_Income
        
   )
  
-
-```
-
-
-
-```{r}
-glimpse(chicagoCensus10)
-```
-
-
-```{r extract_geometries }
+# Extract Census Tracts
 chicagoTracts <- 
   chicagoCensus10 %>%
   as.data.frame() %>%
   distinct(TRTID10, .keep_all = TRUE) %>%
-  select(TRTID10, geometry) %>% 
+  dplyr::select(TRTID10, geometry) %>% 
   st_sf
-```
 
-
-```{r combine data}
+#Combine Data
 chicagoCensus80 <- chicagoCensus80 %>% mutate(Year = 1980)
 chicagoCensus90 <- chicagoCensus90 %>% mutate(Year = 1990)
 chicagoCensus00 <- chicagoCensus00 %>% mutate(Year = 2000)
+chicagoCensus10 <- chicagoCensus10 %>% 
+  st_set_geometry(NULL)
 chicagoCensus10 <- chicagoCensus10 %>% mutate(Year = 2010)
 
 chicago_data <- bind_rows(chicagoCensus80, chicagoCensus90, chicagoCensus00, chicagoCensus10)
+
+chicago_data <- chicago_data%>%
+  mutate(
+    Pt_Profesional_Employed = Professional_Employeed / Total_Employeed * 100,
+    Pt_Currently_Married = Currently_Married / Total_Households * 100,
+    Pt_Employed = Total_Employeed / Total_Pop * 100
+  )%>%
+  dplyr::select(-c(Currently_Married, Professional_Employeed))
+```
+
+```{r basic data explore, message=FALSE, warning=FALSE}
+num_columns <- ncol(chicago_data)
+# 使用head函数确保只展示前五行
+styled_table <- kable(head(chicago_data, 5), format = "html", digits = 2, 
+                      caption = "Sample Table of Predicting Variables, Chicago", booktabs = TRUE) %>%
+  kable_styling(full_width = FALSE) %>%
+  add_header_above(c(" " = 1, "Summary Statistics" = (num_columns - 2), " " = 1), font_size = 15)
+
+# 打印styled_table以展示表格
+styled_table
 ```
 
 
-## 2.3. Calculate City Averages in Chicago
+## 3.2. Calculate City Averages in Chicago
 
-```{r chicago_average}
+The next step of our analysis is calculating the average level of city's variables, and arrange them by the year column. Here is the result table of our calculation: 
+
+```{r chicago_average, message=FALSE, warning=FALSE}
 chicago_averages <- chicago_data %>%
   group_by(Year) %>%
   summarise(
@@ -376,7 +409,8 @@ chicago_averages <- chicago_data %>%
     Vacant_housing_units = sum(Vacant_housing_units, na.rm = TRUE),
     Total_housing_units = sum(Total_housing_units, na.rm = TRUE),
     Median_House_Value_Adjusted = median(Median_House_Value_Adjusted, na.rm = TRUE),
-    Median_Rent_Adjusted = median(Median_Rent_Adjusted, na.rm = TRUE)
+    Median_Rent_Adjusted = median(Median_Rent_Adjusted, na.rm = TRUE),
+    Median_Housedhold_Income_Adjusted = median(Median_Housedhold_Income_Adjusted, na.rm = TRUE)
   )%>%
   
   mutate(Pt_White = (White_Pop / Total_Pop) * 100,
@@ -390,19 +424,17 @@ chicago_averages <- chicago_data %>%
     Pt_Female_Households = Female_Households / Total_Households * 100,
     Pt_Vacant = Vacant_housing_units / Total_housing_units * 100
          )%>%
-select(Year, Pt_White,Pt_Black,Pt_Latino,Pt_Elderly,Pt_Children,Pt_College,Pt_Owner_Occupied,Pt_Below_Poverty,Pt_Female_Households,Pt_Vacant,Median_House_Value_Adjusted,Median_Rent_Adjusted)
-```
+dplyr::select(Year, Pt_White,Pt_Black,Pt_Latino,Pt_Elderly,Pt_Children,Pt_College,Pt_Owner_Occupied,Pt_Below_Poverty,Pt_Female_Households,Pt_Vacant,Median_House_Value_Adjusted,Median_Rent_Adjusted, Median_Housedhold_Income_Adjusted)
 
-```{r}
 styled_table <- kable(chicago_averages, format = "html", digits = 2, 
                       caption = "Summary Statistics by Year", booktabs = TRUE) %>%
   kable_styling(full_width = FALSE) %>%
-  add_header_above(c(" " = 1, "Summary Statistics" = 11, " " = 1), font_size = 15)
+  add_header_above(c(" " = 1, "Summary Statistics" = 12, " " = 1), font_size = 15)
 
 styled_table
 ```
 
-
+We also draw a histogram graph which can help us comparing the changing of variables over the years.
 
 ```{r exploratory_continuous_density, fig.width=10, message=FALSE, warning=FALSE}
 chicago_averages %>%
@@ -416,25 +448,740 @@ chicago_averages %>%
        subtitle = "(City Averages in Chicago)") +
   theme_minimal() +
   theme(legend.position = "none")
+```
+
+## 3.3. Calculate Gentrification Index from 1980-2010 in Chicago  
+
+With the variables of City of Chicago, we can use the formula to calculate the gentrification index. We difined a function 'calculate_index'. Here is the gentrification index:
+
+```{r message=FALSE, warning=FALSE}
+# select data for index calculation
+chicago_data <- chicago_data%>%
+  dplyr::select(Year,TRTID10, Pt_White,Pt_Black,Pt_Latino,Pt_Elderly,Pt_Children,Pt_College,Pt_Owner_Occupied,Pt_Below_Poverty,Pt_Female_Households,Pt_Vacant,Pt_Employed,Pt_Profesional_Employed,Pt_Currently_Married,Median_House_Value_Adjusted,Median_Rent_Adjusted,Median_Housedhold_Income_Adjusted)
+
+calculate_index <- function(row, averages) {
+  variables <- c("Pt_White", "Pt_Black", "Pt_Latino", "Pt_Elderly", "Pt_Children",
+                 "Pt_College", "Median_House_Value_Adjusted", "Median_Rent_Adjusted",
+                 "Pt_Owner_Occupied", "Pt_Below_Poverty", "Pt_Female_Households", "Pt_Vacant", "Median_Housedhold_Income_Adjusted")
+  
+  scores <- c(1, -1, -1, -1, -1, 2, 1, 1, 1, -1, -1, -1, 2)
+  
+  year_avg <- averages %>% filter(Year == row["Year"]) %>% dplyr::select(variables) %>% unlist()
+
+  # Replace NA in row[variables] with 0 for comparison
+  variable_values <- row[variables]
+  if (any(is.na(variable_values))) {
+    variable_values[is.na(variable_values)] <- 0
+  }
+
+  # Replace NA in year_avg with 0 for comparison
+  if (any(is.na(year_avg))) {
+    year_avg[is.na(year_avg)] <- 0
+  }
+
+  score <- sum((variable_values > year_avg) * scores)
+  
+  return(score)
+}
+
+chicago_data$index <- apply(chicago_data, 1, function(row) calculate_index(row, chicago_averages))
+
+num_columns <- ncol(chicago_data)
+# 使用head函数确保只展示前五行
+styled_table <- kable(head(chicago_data, 5), format = "html", digits = 2, 
+                      caption = "Sample Table of Predicting Variables", booktabs = TRUE) %>%
+  kable_styling(full_width = FALSE) %>%
+  add_header_above(c(" " = 1, "Summary Statistics" = (num_columns - 2), " " = 1), font_size = 15)
+
+# 打印styled_table以展示表格
+styled_table
+
+```
+
+We can also draw a map for the gentrification map for the index of all variables for different years: 
+
+```{r chicago gentrification index map, message=FALSE, warning=FALSE}
+# build a new table for gentrification map
+chicago_map <- chicagoTracts %>% 
+  left_join(chicago_data, by = "TRTID10")%>%
+  st_as_sf()
+
+library(scales)
+
+ggplot(chicago_map) +
+  geom_sf(aes(fill = index), colour = "white", size = 0.05) + 
+  facet_wrap(~ Year) +  
+  scale_fill_gradient(name = "Gentrification Index", low = "red", high = "blue", 
+                      breaks = pretty_breaks(n = 7)) +  
+  labs(title = "Gentrification Index Map in Chicago (1980-2010)",
+       caption = "Data source:  1980, 1990, 2000 and 2010 Decennial Census (LTDB); 2008-2012 Five-Year American Community Survey ") +  
+  theme_void() +  
+  theme(legend.position = "bottom",  
+        legend.title.align = 0.5,  
+        plot.title = element_text(size = 14), 
+        plot.caption = element_text(size = 8),  
+        legend.text = element_text(size = 10)) 
+
+```
+
+We set the threshold for gentrification of areas as 6:
+
+```{r chicago gentrification binary map, message=FALSE, warning=FALSE}
+# gentrification index threshold-6
+
+chicago_map <- chicago_map %>%
+  mutate(gentrification = ifelse(index >= 6, 1, 0))
+
+ggplot(chicago_map) +
+  geom_sf(aes(fill = as.factor(gentrification)), colour = NA) +  
+  facet_wrap(~ Year) + 
+  scale_fill_manual(values = c("0" = "red", "1" = "blue"), 
+                    labels = c("0" = "Non_Gentrified", "1" = "Gentrified"), 
+                    name = "Gentrification Status") +  
+  labs(title = "Gentrification Index Map in Chicago (1980-2010)") +  
+  theme_void()  
 
 
 ```
 
+To build the predicting model of gentrification, we need to calculate the difference of all variables with last decades. We determine that the areas with index increases by 2 will be the areas where is facing gentrification risked. Here is a map shows the gentrification risked areas:
 
-## 2.4. Calculate Gentrification Index from 1980-2010 in Chicago
-
-
-
-
+```{r message=FALSE, warning=FALSE}
+#build variable of risked gentrification area
 
 
+# 计算index差值
+chicago_map_risk <- chicago_map %>%
+  arrange(TRTID10, Year) %>%
+  group_by(TRTID10) %>%
+  mutate(
+    index_diff = index - lag(index),
+    Pt_White_diff = Pt_White - lag(Pt_White),
+    Pt_Black_diff = Pt_Black - lag(Pt_Black),
+    Pt_Latino_diff = Pt_Latino - lag(Pt_Latino),
+    Pt_Elderly_diff = Pt_Elderly - lag(Pt_Elderly),
+    Pt_Children_diff = Pt_Children - lag(Pt_Children),
+    Pt_College_diff = Pt_College - lag(Pt_College),
+    Pt_Owner_Occupied_diff = Pt_Owner_Occupied - lag(Pt_Owner_Occupied),
+    Pt_Below_Poverty_diff = Pt_Below_Poverty - lag(Pt_Below_Poverty),
+    Pt_FemalHouseholds_diff = Pt_Female_Households - lag(Pt_Female_Households),
+    Pt_Vacant_diff = Pt_Vacant - lag(Pt_Vacant),
+    Pt_Employed_diff = Pt_Employed - lag(Pt_Employed),
+    Pt_Profesional_Employed_diff = Pt_Profesional_Employed - lag(Pt_Profesional_Employed),
+    Pt_Currently_Married_diff = Pt_Currently_Married - lag(Pt_Currently_Married),
+    Median_House_Value_Adjusted_diff = Median_House_Value_Adjusted - lag(Median_House_Value_Adjusted),
+    Median_Rent_Adjusted_diff = Median_Rent_Adjusted - lag(Median_Rent_Adjusted),
+    Median_Housedhold_Income_Adjusted_diff = Median_Housedhold_Income_Adjusted - lag(Median_Housedhold_Income_Adjusted)
+    ) %>%
+  ungroup()
+
+chicago_map_risk <- chicago_map_risk %>%
+  filter(Year %in% c(1990, 2000, 2010)) %>%
+  na.omit()
+
+chicago_map_risk <- chicago_map_risk %>%
+  mutate(gentri_risk = ifelse(index_diff >= 2, 1, 0)) %>%
+  mutate(gentri_risk_text = ifelse(index_diff >= 2, "risked", "not_risked"))
+
+chicago_map_risk <- chicago_map_risk %>%
+  dplyr::select(,-c(index_diff,gentrification,index,Pt_White,Pt_Black,Pt_Latino,Pt_Elderly,Pt_Children,Pt_College,Pt_Owner_Occupied,Pt_Below_Poverty,Pt_Female_Households,Pt_Vacant,Pt_Employed,Pt_Profesional_Employed,Pt_Currently_Married,Median_House_Value_Adjusted,Median_Rent_Adjusted,Median_Housedhold_Income_Adjusted))
+
+# 查看结果
+ggplot(chicago_map_risk) +
+  geom_sf(aes(fill = as.factor(gentri_risk)), colour = NA) +  
+  facet_wrap(~ Year) + 
+  scale_fill_manual(values = c("0" = "grey", "1" = "orange"), 
+                    labels = c("0" = "Not Significant", "1" = "Gentrified Risked Areas"), 
+                    name = "Risk Status") +  
+  labs(title = "Areas where is facing Gentrification in Chicago (1990-2010)") +  
+  theme_void()  
+```
+## 3.4. Data Explore
+
+After calculate the variables change, we explored the relation between the dependency gentrification index and independent variables:
+
+```{r message=FALSE, warning=FALSE}
+chicago_map_risk %>%
+  st_set_geometry(NULL) %>%
+    dplyr::select(gentri_risk_text,Pt_White_diff,Pt_Black_diff,Pt_Latino_diff,Pt_Elderly_diff,Pt_Children_diff,Pt_College_diff) %>%
+    gather(Variable, value, -gentri_risk_text) %>%
+    ggplot(aes(gentri_risk_text, value, fill=gentri_risk_text)) + 
+      geom_bar(position = "dodge", stat = "summary", fun = "mean") + 
+      facet_wrap(~Variable, scales = "free") +
+      scale_fill_manual(values = palette2) +
+      labs(x="Gentrification Risk", y="Value", 
+           title = "Gentrification Risk of Areas associations with Socioeconomic Status") +
+      theme(legend.position = "none")
 
 
 
+chicago_map_risk %>%
+  st_set_geometry(NULL) %>%
+    dplyr::select(gentri_risk_text,Pt_Owner_Occupied_diff,Pt_Vacant_diff,Median_House_Value_Adjusted_diff,Median_Rent_Adjusted_diff) %>%
+    gather(Variable, value, -gentri_risk_text) %>%
+    ggplot(aes(gentri_risk_text, value, fill=gentri_risk_text)) + 
+      geom_bar(position = "dodge", stat = "summary", fun = "mean") + 
+      facet_wrap(~Variable, scales = "free") +
+      scale_fill_manual(values = palette2) +
+      labs(x="Gentrification Risk", y="Value", 
+           title = "Gentrification Risk of Areas associations with Housing Status") +
+      theme(legend.position = "none")
+
+chicago_map_risk %>%
+  st_set_geometry(NULL) %>%
+    dplyr::select(gentri_risk_text,Pt_Below_Poverty_diff,Pt_FemalHouseholds_diff,Median_Housedhold_Income_Adjusted_diff,Pt_Employed_diff,Pt_Profesional_Employed_diff,Pt_Currently_Married_diff) %>%
+    gather(Variable, value, -gentri_risk_text) %>%
+    ggplot(aes(gentri_risk_text, value, fill=gentri_risk_text)) + 
+      geom_bar(position = "dodge", stat = "summary", fun = "mean") + 
+      facet_wrap(~Variable, scales = "free") +
+      scale_fill_manual(values = palette2) +
+      labs(x="Gentrification Risk", y="Value", 
+           title = "Gentrification Risk of Areas associations with Households Status") +
+      theme(legend.position = "none")
+```
+
+From the results, we can see that there are significant different in variables where areas is risked and not risked, so the variables we choose should be able to build the model we are expecting. 
+
+# 4 Gentrification Model Building
+
+## 4.1. Model Building
+
+Since the goal of this model is to predict the high-risk areas of gentrifying, we can use the Logistic regression as our model. Logistic regression is a parametric classification model that uses a logistic function to estimate binary output models. So it’s very useful when predicting the binary result, which is risked or not risked.
+
+```{r message=FALSE, warning=FALSE}
+# set random seed and split the data to 30% & 70%
+set.seed(3456)
+trainIndex <- createDataPartition(chicago_map_risk$gentri_risk, p = .70,
+                                  list = FALSE,
+                                  times = 1)
+Chicagogen_riskTrain <- chicago_map_risk[ trainIndex,] %>%
+  st_set_geometry(NULL)
+Chicagogen_riskTest  <- chicago_map_risk[-trainIndex,] %>%
+  st_set_geometry(NULL)
+```
+
+After building the model, we can explore the performance of our model. The correlation of variables related to ethnicity is not significant, so we eliminate them from our model. The final model have McFadden R2 of 0.358, which is reliable compare to other logistic regression model.
+
+```{r}
+gentrificationModel <- glm(gentri_risk ~ .,
+                  data=Chicagogen_riskTrain %>% 
+                    dplyr::select(-c(TRTID10,Pt_White_diff,Pt_Black_diff,Pt_Latino_diff,Year,gentri_risk_text)),
+                  family="binomial" (link="logit"))
+
+summary(gentrificationModel)
+pR2(gentrificationModel)
+```
+
+## 4.2. Make Predictions
+
+Next, we use our model to make predictions on the test set to get our prediction of potential gentrified areas. By comparing with the real results, we can see that the model basically fulfills the function, but there may be a case where the *False Negative* is too high. The model is able to predict the not-risked areas very well. and  
+
+```{r plot_testProbs}
+testProbs <- data.frame(Outcome = as.factor(Chicagogen_riskTest$gentri_risk),
+                        Probs = predict(gentrificationModel, Chicagogen_riskTest, type= "response"))
+
+ggplot(testProbs, aes(x = Probs, fill = as.factor(Outcome))) + 
+  geom_density() +
+  facet_grid(Outcome ~ .) +
+  scale_fill_manual(values = palette2) +
+  labs(x = "Click", y = "Density of probabilities",
+       title = "Distribution of predicted probabilities by observed outcome") +
+  theme(strip.text.x = element_text(size = 18),
+        legend.position = "none")
+```
+
+# 5 Model Testing
+
+## 5.1. Confusion Matrix
+
+We can judge the accuracy of our results by using the CONFUSION MATRIX, we use *0.12* as the threshold for logical judgment and the accuracy of the results is *84.25%*. The model has a sensitivity of *0.736* and a specificity of *0.857*. This result is acceptable.
+
+```{r thresholds}
+testProbs <- 
+  testProbs %>%
+  mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.12 , 1, 0)))
+
+caret::confusionMatrix(testProbs$predOutcome, testProbs$Outcome, 
+                       positive = "1")
+```
+
+## 5.2. ROC Curve
+
+On this basis, we also plotted the ROC curve to determine the fit of the model, according to the calculation, the AUC area of the model is 0.8847, which is greater than 0.5, the result is credible.
+
+```{r roc_curve, warning = FALSE, message = FALSE}
+ggplot(testProbs, aes(d = as.numeric(Outcome), m = Probs)) +
+  geom_roc(n.cuts = 50, labels = FALSE, colour = "#FE9900") +
+  style_roc(theme = theme_grey) +
+  geom_abline(slope = 1, intercept = 0, size = 1.5, color = 'grey') +
+  labs(title = "ROC Curve - clickModel")
+
+auc(testProbs$Outcome, testProbs$Probs)
+```
+
+## 5.3. Cross validation
+
+In this part, We run 100-fold cross validation and look at the ROC (AUC), Sensitivity and Specificity across this series of prediciton. And the ROC is 0.8798, which indicates that our model is creditable when predicting the gentri-risked areas. 
+
+```{r cv}
+ctrl <- trainControl(method = "cv", number = 100, classProbs=TRUE, summaryFunction=twoClassSummary)
+
+chicago_risk <- chicago_map_risk %>%
+  st_set_geometry(NULL)
+
+cvFit <- train(gentri_risk_text ~ .,
+                  data=chicago_risk %>%
+                    dplyr::select(-c(TRTID10,Year,gentri_risk)), 
+                method="glm", family="binomial",
+                metric="ROC", trControl = ctrl)
+
+cvFit
+```
+
+```{r goodness_metrics, message = FALSE, warning = FALSE}
+dplyr::select(cvFit$resample, -Resample) %>%
+  gather(metric, value) %>%
+  left_join(gather(cvFit$results[2:4], metric, mean)) %>%
+  ggplot(aes(value)) + 
+    geom_histogram(bins=35, fill = "#FF006A") +
+    facet_wrap(~metric) +
+    geom_vline(aes(xintercept = mean), colour = "#981FAC", linetype = 3, size = 1.5) +
+    scale_x_continuous(limits = c(0, 1)) +
+    labs(x="Goodness of Fit", y="Count", title="CV Goodness of Fit Metrics",
+         subtitle = "Across-fold mean reprented as dotted lines")
+
+```
+
+## 5.4. Cost-Benefit Calculation
+
+In order to get a relatively reasonable threshold, we need to build a *cost-benefit* model for the calculation.In this prediction, we believe that providing the financial help to the gentrified areas will control the population lost and generate more tax revenue, this increase will be 8 million dollar per area. But the financial help will also have a cost, which is 2 million dollar per area. The failure to predict a gentrification areas will also brings financial lost, but this effect is not significant since the increase of areas' income level, which is 3 million dollar per area.
+
+-Costs of providing financial help: $2million/area
+
+-Economic losses as a result of the gentrification: $3million/area
+
+-Tax revenue increase for helping a gentrified areas: $8million/area
+
+```{r cost_benefit}
+cost_benefit_table <-
+   testProbs %>%
+      count(predOutcome, Outcome) %>%
+      summarize(True_Negative = sum(n[predOutcome==0 & Outcome==0]),
+                True_Positive = sum(n[predOutcome==1 & Outcome==1]),
+                False_Negative = sum(n[predOutcome==0 & Outcome==1]),
+                False_Positive = sum(n[predOutcome==1 & Outcome==0])) %>%
+       gather(Variable, Count) %>%
+       mutate(Revenue =
+               ifelse(Variable == "True_Negative", 0 * Count,
+               ifelse(Variable == "True_Positive", Count * (8-2),
+               ifelse(Variable == "False_Negative", (-3) * Count,
+               ifelse(Variable == "False_Positive", (-2) * Count, 0))))) %>%
+    bind_cols(data.frame(Description = c(
+              "We correctly predicted no recidivism, and let the prisoner go",
+              "We correctly predicted recidivism and Observe him strictly",
+              "We predicted no recidivism but prisoner recidivism",
+              "We predicted recidivism and prisoner did not recidivism")))
+
+kable(cost_benefit_table,
+       caption = "Cost/Benefit Table") %>% kable_styling()
+```
+
+## 5.5. Optimize Thresholds
+
+The last step to tuning our model is to run it for each threshold value.  We can then look at the confusion matrices for each threshold and choose the one that returns the most revenue.From the results, we can see that the maximum gain is obtained when the threshold is set around *0.12*.
+
+```{r iterate_threshold}
+iterateThresholds <- function(data) {
+  x = .01
+  all_prediction <- data.frame()
+  while (x <= 1) {
+  
+  this_prediction <-
+      testProbs %>%
+      mutate(predOutcome = ifelse(Probs > x, 1, 0)) %>%
+      count(predOutcome, Outcome) %>%
+      summarize(True_Negative = sum(n[predOutcome==0 & Outcome==0]),
+                True_Positive = sum(n[predOutcome==1 & Outcome==1]),
+                False_Negative = sum(n[predOutcome==0 & Outcome==1]),
+                False_Positive = sum(n[predOutcome==1 & Outcome==0])) %>%
+     gather(Variable, Count) %>%
+     mutate(Revenue =
+               ifelse(Variable == "True_Negative", 0 * Count,
+               ifelse(Variable == "True_Positive", Count * (8-2),
+               ifelse(Variable == "False_Negative", (-3) * Count,
+               ifelse(Variable == "False_Positive", (-2) * Count, 0)))),
+            Threshold = x)
+  
+  all_prediction <- rbind(all_prediction, this_prediction)
+  x <- x + .01
+  }
+return(all_prediction)
+}
+
+whichThreshold <- iterateThresholds(testProbs2)
+
+whichThreshold_revenue <- 
+whichThreshold %>% 
+    group_by(Threshold) %>% 
+    summarize(Revenue = sum(Revenue))
+
+  ggplot(whichThreshold_revenue)+
+  geom_line(aes(x = Threshold, y = Revenue))+
+  geom_vline(xintercept =  pull(arrange(whichThreshold_revenue, -Revenue)[1,1]))+
+    labs(title = "Model Revenues By Threshold For Test Sample",
+         subtitle = "Vertical Line Denotes Optimal Threshold")
+```
+## 5.6. Interpreting Logit Coefficients
+
+Next, we can look at the odds ratios of the coefficients of this model to examine which variables have the greatest impact on the model. From the result, we can see that percentage change of college education population have the most contribution to the prediction:
+
+```{r}
+coefficients_log_odds <- coef(gentrificationModel)
+
+odds_ratios <- exp(coefficients_log_odds)
+print(odds_ratios)
+```
+
+# 6 Validation
+
+In this part, we import the data of Philadelphia area, and try to validate our model on it.
+
+## 6.1. Import Philly Data
+
+The data of Philadelphia is show as follow:
+
+```{r PhillyCensus00, message=FALSE, warning=FALSE, include=FALSE}
+phillyCensus00 <- data00 %>%
+  filter(county.x == "Philadelphia County" & state.x == "PA")%>%
+
+  rename(Total_Pop = POP00,
+         White_Pop = NHWHT00,
+         Black_Pop = NHBLK00,
+         Latino_Pop = HISP00,
+         Elder_Pop = A60UP00,
+         Children_Pop = A18UND00,
+         College_Pop = COL00,
+         Owner_Occupied = OWN00,
+         Total_housing_units = HU00,
+         Vacant_housing_units = VAC00,
+         Median_House_Value = MHMVAL00,
+         Median_Rent = MRENT00,
+         Below_Poverty_Pop = NPOV00,
+         Professional_Employeed = PROF00,
+         Total_Employeed = EMPCLF00,
+         Female_Households = FHH00,
+         Total_Households = FAMILY00,
+         Median_Housedhold_Income = HINC00,
+         Currently_Married = Mar.00)%>%
+  dplyr::select(TRTID10, Total_Pop, White_Pop, Black_Pop, Latino_Pop, Elder_Pop, Children_Pop, College_Pop, Owner_Occupied, Median_House_Value, Median_Rent, Below_Poverty_Pop, Professional_Employeed, Total_Employeed, Female_Households, Total_Households, Total_housing_units, Vacant_housing_units,Median_Housedhold_Income,Currently_Married)%>%
+  mutate(
+    Pt_White = White_Pop / Total_Pop * 100, 
+    Pt_Black = Black_Pop / Total_Pop * 100, 
+    Pt_Latino = Latino_Pop / Total_Pop * 100,  
+    Pt_Elderly = Elder_Pop / Total_Pop * 100,  # % Elderly (Age 75+)
+    Pt_Children = (Children_Pop / Total_Pop) * 100,  # % Children (Age <18)
+    Pt_College = College_Pop / Total_Pop * 100,
+    Pt_Owner_Occupied = Owner_Occupied / Total_housing_units * 100,  
+    Median_House_Value_Adjusted = Median_House_Value * 1.27,  # Median House Value, adjust for inflation
+    Median_Rent_Adjusted = Median_Rent * 1.27, # Median Rent Value, adjust for inflation
+    Pt_Below_Poverty = Below_Poverty_Pop / Total_Pop * 100,
+    Pt_Female_Households = Female_Households / Total_Households * 100,
+    Pt_Vacant = Vacant_housing_units / Total_housing_units * 100,
+    Median_Housedhold_Income_Adjusted = Median_Housedhold_Income * 1.27
+  )
+ 
+
+phillyCensus10a <- 
+  get_acs(geography = "tract", 
+          variables = c("B01003_001", "B02009_001", 
+                        "B02001_002", "B03001_003",
+                        "B06001_012", "B09001_001", 
+                        "B06009_005","B07013_002",
+                        "B25001_001", "B25004_001",
+                        "B25077_001", "B25064_001",
+                        "B17001_002", "B24011_001",
+                        	"B11005_002","B11001_001",
+                        "C24010_003","C24010_001",
+                        "B19013_001","B12001_001"), #"B23006_027", "B23006_013", "B23006_006", "B23006_020",
+          year = 2010, 
+          state = "PA", 
+          geometry = TRUE, 
+          county=c("Philadelphia"),
+          output = "wide") %>%
+  
+  rename(College_Pop = B06009_005E,
+         Median_House_Value = B25077_001E,
+         Median_Rent = B25064_001E,
+         Below_Poverty_Pop = B17001_002E,
+         Professional_Employeed = C24010_003E,
+         Total_Employeed = C24010_001E,
+         Median_Housedhold_Income = B19013_001E,
+         Currently_Married = B12001_001E
+         )%>%
+  
+  mutate(TRTID10 = as.numeric(GEOID))
+
+phillyCensus10b <- data10 %>%
+  filter(county == "Philadelphia County" & state == "PA")%>%
+
+  rename(TRTID10= tractid,
+    Total_Pop = pop10,
+         White_Pop = nhwht10,
+         Black_Pop = nhblk10,
+         Latino_Pop = hisp10,
+         Elder_Pop = a60up10,
+         Children_Pop = a18und10,
+         Owner_Occupied = own10,
+         Total_housing_units = hu10,
+         Vacant_housing_units = vac10,
+         Female_Households = fhh10,
+         Total_Households = family10)
+
+
+#College_Pop = COL00,Median_House_Value = MHMVAL00,Median_Rent = MRENT00,Below_Poverty_Pop = NPOV00,
+phillyCensus10 <- phillyCensus10a %>%
+  inner_join(phillyCensus10b,by ="TRTID10")%>%
+  
+  dplyr::select(TRTID10, Total_Pop, White_Pop, Black_Pop, Latino_Pop, Elder_Pop, Children_Pop, College_Pop, Owner_Occupied, Median_House_Value, Median_Rent, Below_Poverty_Pop, Professional_Employeed, Total_Employeed, Female_Households, Total_Households, Total_housing_units, Vacant_housing_units,Median_Housedhold_Income,Currently_Married)%>%
+  
+  mutate(
+    Pt_White = White_Pop / Total_Pop * 100, 
+    Pt_Black = Black_Pop / Total_Pop * 100, 
+    Pt_Latino = Latino_Pop / Total_Pop * 100,  
+    Pt_Elderly = Elder_Pop / Total_Pop * 100,  # % Elderly (Age 60+)
+    Pt_Children = (Children_Pop / Total_Pop) * 100,  # % Children (Age <18)
+    Pt_College = College_Pop / Total_Pop * 100,
+    Pt_Owner_Occupied = Owner_Occupied / Total_housing_units * 100,  
+    Median_House_Value_Adjusted = Median_House_Value,  # Median House Value, adjust for inflation
+    Median_Rent_Adjusted = Median_Rent, # Median Rent Value, adjust for inflation
+    Pt_Below_Poverty = Below_Poverty_Pop / Total_Pop * 100,
+    Pt_Female_Households = Female_Households / Total_Households * 100,
+    Pt_Vacant = Vacant_housing_units / Total_housing_units * 100,
+    Median_Housedhold_Income_Adjusted = Median_Housedhold_Income
+       
+  )
+ 
+
+phillyTracts <- 
+  phillyCensus10 %>%
+  as.data.frame() %>%
+  distinct(TRTID10, .keep_all = TRUE) %>%
+  dplyr::select(TRTID10, geometry) %>% 
+  st_sf
+
+
+phillyCensus00 <- phillyCensus00 %>% mutate(Year = 2000)
+phillyCensus10 <- phillyCensus10 %>% 
+  st_set_geometry(NULL)
+phillyCensus10 <- phillyCensus10 %>% mutate(Year = 2010)
+
+philly_data <- bind_rows(phillyCensus00, phillyCensus10)
+
+philly_data <- philly_data%>%
+  mutate(
+    Pt_Profesional_Employed = Professional_Employeed / Total_Employeed * 100,
+    Pt_Currently_Married = Currently_Married / Total_Households * 100,
+    Pt_Employed = Total_Employeed / Total_Pop * 100
+  )%>%
+  dplyr::select(-c(Currently_Married, Professional_Employeed))
+
+```
+
+```{r}
+num_columns <- ncol(philly_data)
+# 使用head函数确保只展示前五行
+styled_table <- kable(head(philly_data, 5), format = "html", digits = 2, 
+                      caption = "Sample Table of Predicting Variables, Philadelphia", booktabs = TRUE) %>%
+  kable_styling(full_width = FALSE) %>%
+  add_header_above(c(" " = 1, "Summary Statistics" = (num_columns - 2), " " = 1), font_size = 15)
+
+# 打印styled_table以展示表格
+styled_table
+```
 
 
 
+```{r philly_average, message=FALSE, warning=FALSE, include=FALSE}
+philly_averages <- philly_data %>%
+  group_by(Year) %>%
+  summarise(
+    Total_Pop = sum(Total_Pop, na.rm = TRUE),
+    White_Pop = sum(White_Pop, na.rm = TRUE),
+    Black_Pop = sum(Black_Pop, na.rm = TRUE),
+    Latino_Pop = sum(Latino_Pop, na.rm = TRUE),
+    Elder_Pop = sum(Elder_Pop, na.rm = TRUE),
+    Children_Pop = sum(Children_Pop, na.rm = TRUE),
+    College_Pop = sum(College_Pop, na.rm = TRUE),
+    Owner_Occupied = sum(Owner_Occupied, na.rm = TRUE),
+    Below_Poverty_Pop = sum(Below_Poverty_Pop, na.rm = TRUE),
+    Female_Households = sum(Female_Households, na.rm = TRUE),
+    Total_Households = sum(Total_Households, na.rm = TRUE),
+    Vacant_housing_units = sum(Vacant_housing_units, na.rm = TRUE),
+    Total_housing_units = sum(Total_housing_units, na.rm = TRUE),
+    Median_House_Value_Adjusted = median(Median_House_Value_Adjusted, na.rm = TRUE),
+    Median_Rent_Adjusted = median(Median_Rent_Adjusted, na.rm = TRUE),
+    Median_Housedhold_Income_Adjusted = median(Median_Housedhold_Income_Adjusted, na.rm = TRUE)
+  )%>%
+  
+  mutate(Pt_White = (White_Pop / Total_Pop) * 100,
+         Pt_Black = Black_Pop / Total_Pop * 100, 
+    Pt_Latino = Latino_Pop / Total_Pop * 100,  
+    Pt_Elderly = Elder_Pop / Total_Pop * 100,  # % Elderly (Age 60+)
+    Pt_Children = (Children_Pop / Total_Pop) * 100,  # % Children (Age <18)
+    Pt_College = College_Pop / Total_Pop * 100,
+    Pt_Owner_Occupied = Owner_Occupied / Total_housing_units * 100,  
+    Pt_Below_Poverty = Below_Poverty_Pop / Total_Pop * 100,
+    Pt_Female_Households = Female_Households / Total_Households * 100,
+    Pt_Vacant = Vacant_housing_units / Total_housing_units * 100
+         )%>%
+dplyr::select(Year, Pt_White,Pt_Black,Pt_Latino,Pt_Elderly,Pt_Children,Pt_College,Pt_Owner_Occupied,Pt_Below_Poverty,Pt_Female_Households,Pt_Vacant,Median_House_Value_Adjusted,Median_Rent_Adjusted, Median_Housedhold_Income_Adjusted)
+```
 
+
+
+```{r message=FALSE, warning=FALSE}
+philly_data <- philly_data%>%
+  dplyr::select(Year,TRTID10, Pt_White,Pt_Black,Pt_Latino,Pt_Elderly,Pt_Children,Pt_College,Pt_Owner_Occupied,Pt_Below_Poverty,Pt_Female_Households,Pt_Vacant,Pt_Employed,Pt_Profesional_Employed,Pt_Currently_Married,Median_House_Value_Adjusted,Median_Rent_Adjusted,Median_Housedhold_Income_Adjusted)
+
+philly_data$index <- apply(philly_data, 1, function(row) calculate_index(row, philly_averages))
+```
+
+From the gentrification index map of Philadelphia, we can see that the Central City areas and Suburban areas of City have higher gentrification index level.
+
+```{r philly gentrification index map}
+philly_map <- phillyTracts %>% 
+  left_join(philly_data, by = "TRTID10")%>%
+  st_as_sf()
+
+ggplot(philly_map) +
+  geom_sf(aes(fill = index), colour = "white", size = 0.1) + 
+  facet_wrap(~ Year) +  
+  scale_fill_gradient(name = "Gentrification Index", low = "red", high = "blue", 
+                      breaks = pretty_breaks(n = 7)) +  
+  labs(title = "Gentrification Index Map in Philadelphia (2000-2010)",
+       caption = "Data source:  2000 and 2010 Decennial Census (LTDB); 2008-2012 Five-Year American Community Survey ") +  
+  theme_void() +  
+  theme(legend.position = "bottom",  
+        legend.title.align = 0.5,  
+        plot.title = element_text(size = 14), 
+        plot.caption = element_text(size = 8),  
+        legend.text = element_text(size = 10)) 
+
+```
+
+## 6.2. Predict the Risked Areas of Philadelphia
+
+Here is the map for the result of gentrification risk:
+
+```{r message=FALSE, warning=FALSE}
+#build variable of risked gentrification area
+
+philly_map <- philly_map %>%
+  mutate(gentrification = ifelse(index >= 6, 1, 0))
+
+# 计算index差值
+philly_map_risk <- philly_map %>%
+  arrange(TRTID10, Year) %>%
+  group_by(TRTID10) %>%
+  mutate(
+    index_diff = index - lag(index),
+    Pt_White_diff = Pt_White - lag(Pt_White),
+    Pt_Black_diff = Pt_Black - lag(Pt_Black),
+    Pt_Latino_diff = Pt_Latino - lag(Pt_Latino),
+    Pt_Elderly_diff = Pt_Elderly - lag(Pt_Elderly),
+    Pt_Children_diff = Pt_Children - lag(Pt_Children),
+    Pt_College_diff = Pt_College - lag(Pt_College),
+    Pt_Owner_Occupied_diff = Pt_Owner_Occupied - lag(Pt_Owner_Occupied),
+    Pt_Below_Poverty_diff = Pt_Below_Poverty - lag(Pt_Below_Poverty),
+    Pt_FemalHouseholds_diff = Pt_Female_Households - lag(Pt_Female_Households),
+    Pt_Vacant_diff = Pt_Vacant - lag(Pt_Vacant),
+    Pt_Employed_diff = Pt_Employed - lag(Pt_Employed),
+    Pt_Profesional_Employed_diff = Pt_Profesional_Employed - lag(Pt_Profesional_Employed),
+    Pt_Currently_Married_diff = Pt_Currently_Married - lag(Pt_Currently_Married),
+    Median_House_Value_Adjusted_diff = Median_House_Value_Adjusted - lag(Median_House_Value_Adjusted),
+    Median_Rent_Adjusted_diff = Median_Rent_Adjusted - lag(Median_Rent_Adjusted),
+    Median_Housedhold_Income_Adjusted_diff = Median_Housedhold_Income_Adjusted - lag(Median_Housedhold_Income_Adjusted)
+    ) %>%
+  ungroup()
+
+philly_map_risk <- philly_map_risk %>%
+  filter(Year %in% c(1990, 2000, 2010)) %>%
+  na.omit()
+
+philly_map_risk <- philly_map_risk %>%
+  mutate(gentri_risk = ifelse(index_diff >= 2, 1, 0)) %>%
+  mutate(gentri_risk_text = ifelse(index_diff >= 2, "risked", "not_risked"))
+
+philly_map_risk <- philly_map_risk %>%
+  dplyr::select(,-c(index_diff,gentrification,index,Pt_White,Pt_Black,Pt_Latino,Pt_Elderly,Pt_Children,Pt_College,Pt_Owner_Occupied,Pt_Below_Poverty,Pt_Female_Households,Pt_Vacant,Pt_Employed,Pt_Profesional_Employed,Pt_Currently_Married,Median_House_Value_Adjusted,Median_Rent_Adjusted,Median_Housedhold_Income_Adjusted))
+
+# 查看结果
+ggplot(philly_map_risk) +
+  geom_sf(aes(fill = as.factor(gentri_risk)), colour = NA) +  
+  facet_wrap(~ Year) + 
+  scale_fill_manual(values = c("0" = "grey", "1" = "orange"), 
+                    labels = c("0" = "Not Significant", "1" = "Gentrified Risked Areas"), 
+                    name = "Risk Status") +  
+  labs(title = "Areas where is facing Gentrification in Philadelphia 2010") +  
+  theme_void()  
+```
+
+By Applying the model, Next, we can see that the model basically fulfills the function, but there may be a case where the *False Negative* is too high. The model is able to predict the not-risked areas very well in Philadelphia areas. 
+
+```{r plot_testProbs2}
+philly_risk <- philly_map_risk %>%
+  st_set_geometry(NULL)
+
+testProbs <- data.frame(Outcome = as.factor(philly_risk$gentri_risk),
+                        Probs = predict(gentrificationModel, philly_risk, type= "response"))
+
+ggplot(testProbs, aes(x = Probs, fill = as.factor(Outcome))) + 
+  geom_density() +
+  facet_grid(Outcome ~ .) +
+  scale_fill_manual(values = palette2) +
+  labs(x = "Click", y = "Density of probabilities",
+       title = "Distribution of predicted probabilities by observed outcome") +
+  theme(strip.text.x = element_text(size = 18),
+        legend.position = "none")
+```
+
+We can also judge the accuracy of our results by using the CONFUSION MATRIX. For Philadelphia areas, we use *0.25* as the threshold for logical judgment and the accuracy of the results is *81.69%*. The model has a sensitivity of *0.789* and a specificity of *0.822*. This result is acceptable.
+
+```{r thresholds2}
+testProbs <- 
+  testProbs %>%
+  mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.25 , 1, 0)))
+
+philly_map_risk <- mutate(philly_map_risk, predicted_prob = testProbs$predOutcome)
+
+caret::confusionMatrix(testProbs$predOutcome, testProbs$Outcome, 
+                       positive = "1")
+```
+
+Here is map for the predicted gentrified risk areas. Overall, the model does a good job of predicting areas of higher risk, with some error but overall high accuracy.
+
+```{r}
+ggplot(philly_map_risk) +
+  geom_sf(aes(fill = as.factor(predicted_prob)), colour = NA) +  
+  
+  facet_wrap(~ Year) + 
+  scale_fill_manual(values = c("0" = "grey", "1" = "red"), 
+                    labels = c("0" = "Not Significant", "1" = "Gentrified Risked Areas"), 
+                    name = "Risk Status") +  
+  labs(title = "Prediction Areas where is facing Gentrification in Philadelphia, 2010") +  
+  theme_void()  
+```
+
+
+# *Reference:*
+
+Bureau, U. C. (n.d.). Identifying gentrification using machine learning. Census.Gov. Retrieved May 9, 2024, from https://www.census.gov/library/working-papers/2023/demo/SEHSD-WP-2023-15.html
+
+Gentrification Index | Nathalie P. Voorhees Center for Neighborhood and Community Improvement | University of Illinois Chicago. (n.d.). Retrieved May 9, 2024, from https://voorheescenter.uic.edu/what-we-do/areas-of-research/gentrification-index/
+
+Lees, L., Slater, T., & Wyly, E. K. (2008). Gentrification. Routledge.
+
+Mayer, N. S. (1981). Rehabilitation decisions in rental housing: An empirical analysis. Journal of Urban Economics, 10(1), 76–94.
 
 
 
