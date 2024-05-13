@@ -595,6 +595,7 @@ ggplot(chicago_map_risk) +
   labs(title = "Areas where is facing Gentrification in Chicago (1990-2010)") +  
   theme_void()  
 ```
+
 ## 3.4. Data Explore
 
 After calculate the variables change, we explored the relation between the dependency gentrification index and independent variables:
