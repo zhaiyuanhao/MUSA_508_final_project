@@ -40,7 +40,5 @@ education facilities numbers nearby,
 We use a logistic regression model, The predicted result will be 0 or 1.
 A detailed explanation will be provided in the report[https://github.com/zhaiyuanhao/MUSA_508_final_project/blob/main/Gentrification_Prediction_Model_Report_Yuanhao_Jiewen.pdf].
 
-# Final Public Report
-
 # Reference
 https://urbanspatialanalysis.com/portfolio/predicting-gentrification-using-longitudinal-census-data/
